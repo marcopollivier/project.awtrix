@@ -1,0 +1,297 @@
+[
+ {
+  "name": "ai-training",
+  "fork": true,
+  "stargazers_count": 0
+ },
+ {
+  "name": "asdf-clojure",
+  "fork": true,
+  "stargazers_count": 0
+ },
+ {
+  "name": "asdf-golang",
+  "fork": true,
+  "stargazers_count": 0
+ },
+ {
+  "name": "asdf-gradle",
+  "fork": true,
+  "stargazers_count": 0
+ },
+ {
+  "name": "asdf-maven",
+  "fork": true,
+  "stargazers_count": 0
+ },
+ {
+  "name": "big-bang",
+  "fork": false,
+  "stargazers_count": 7
+ },
+ {
+  "name": "check.clj-core-utils",
+  "fork": false,
+  "stargazers_count": 0
+ },
+ {
+  "name": "class.c",
+  "fork": false,
+  "stargazers_count": 0
+ },
+ {
+  "name": "class.clean-arch-with-csharp",
+  "fork": false,
+  "stargazers_count": 5
+ },
+ {
+  "name": "class.dio-expert-session-finance",
+  "fork": false,
+  "stargazers_count": 12
+ },
+ {
+  "name": "class.dio.webinar-go-first-steps",
+  "fork": false,
+  "stargazers_count": 4
+ },
+ {
+  "name": "class.docker-newrelic",
+  "fork": false,
+  "stargazers_count": 0
+ },
+ {
+  "name": "class.elastic-search-csharp",
+  "fork": false,
+  "stargazers_count": 0
+ },
+ {
+  "name": "class.fiap.charp.db-nosql",
+  "fork": false,
+  "stargazers_count": 4
+ },
+ {
+  "name": "class.go",
+  "fork": false,
+  "stargazers_count": 1
+ },
+ {
+  "name": "class.grafana-csharp",
+  "fork": false,
+  "stargazers_count": 0
+ },
+ {
+  "name": "class.introducao-go",
+  "fork": false,
+  "stargazers_count": 2
+ },
+ {
+  "name": "class.java-basico",
+  "fork": false,
+  "stargazers_count": 203
+ },
+ {
+  "name": "claude-migration-framework",
+  "fork": false,
+  "stargazers_count": 0
+ },
+ {
+  "name": "clojure-por-exemplo",
+  "fork": true,
+  "stargazers_count": 0
+ },
+ {
+  "name": "config.config-files",
+  "fork": true,
+  "stargazers_count": 0
+ },
+ {
+  "name": "config.llm-personas",
+  "fork": true,
+  "stargazers_count": 0
+ },
+ {
+  "name": "config.nvim",
+  "fork": true,
+  "stargazers_count": 0
+ },
+ {
+  "name": "fiap-cloud-games",
+  "fork": true,
+  "stargazers_count": 0
+ },
+ {
+  "name": "go-hubspot",
+  "fork": true,
+  "stargazers_count": 0
+ },
+ {
+  "name": "go-simple-icons",
+  "fork": false,
+  "stargazers_count": 3
+ },
+ {
+  "name": "jasmine-angular-todolist",
+  "fork": false,
+  "stargazers_count": 0
+ },
+ {
+  "name": "kronk",
+  "fork": true,
+  "stargazers_count": 0
+ },
+ {
+  "name": "kronk_catalogs",
+  "fork": true,
+  "stargazers_count": 0
+ },
+ {
+  "name": "marcopollivier",
+  "fork": false,
+  "stargazers_count": 2
+ },
+ {
+  "name": "poc-flexible-journey",
+  "fork": false,
+  "stargazers_count": 0
+ },
+ {
+  "name": "poc-order-service",
+  "fork": false,
+  "stargazers_count": 0
+ },
+ {
+  "name": "poc-product-service",
+  "fork": false,
+  "stargazers_count": 0
+ },
+ {
+  "name": "poc.clojure",
+  "fork": false,
+  "stargazers_count": 0
+ },
+ {
+  "name": "poc.gleam.hello",
+  "fork": false,
+  "stargazers_count": 0
+ },
+ {
+  "name": "poc.go-redpanda",
+  "fork": false,
+  "stargazers_count": 0
+ },
+ {
+  "name": "poc.proxy-reverso-angular-camel",
+  "fork": false,
+  "stargazers_count": 0
+ },
+ {
+  "name": "poc.springboot-restapi",
+  "fork": false,
+  "stargazers_count": 2
+ },
+ {
+  "name": "poc.test-pyramid",
+  "fork": false,
+  "stargazers_count": 0
+ },
+ {
+  "name": "practice.node-with-xml",
+  "fork": false,
+  "stargazers_count": 2
+ },
+ {
+  "name": "practice.springboot_jwt_auth0_poc",
+  "fork": false,
+  "stargazers_count": 0
+ },
+ {
+  "name": "practice.svelte-monorepo",
+  "fork": false,
+  "stargazers_count": 1
+ },
+ {
+  "name": "practice.versionamento-db-liquibase",
+  "fork": false,
+  "stargazers_count": 1
+ },
+ {
+  "name": "practice.versionamento-db-liquibase-aprofundando-mais",
+  "fork": false,
+  "stargazers_count": 0
+ },
+ {
+  "name": "presentation.desbloqueando-kong",
+  "fork": false,
+  "stargazers_count": 2
+ },
+ {
+  "name": "presentation.gofunctional",
+  "fork": false,
+  "stargazers_count": 1
+ },
+ {
+  "name": "presentation.junit5-vale-a-pena-migrar",
+  "fork": false,
+  "stargazers_count": 0
+ },
+ {
+  "name": "presentation.rag-with-go",
+  "fork": false,
+  "stargazers_count": 0
+ },
+ {
+  "name": "presentation.tdc.pact-go-node",
+  "fork": false,
+  "stargazers_count": 0
+ },
+ {
+  "name": "presentation.tdc.trpc",
+  "fork": false,
+  "stargazers_count": 0
+ },
+ {
+  "name": "presentation.traefik-da-poc-a-prod",
+  "fork": false,
+  "stargazers_count": 0
+ },
+ {
+  "name": "progit2-pt-br",
+  "fork": true,
+  "stargazers_count": 0
+ },
+ {
+  "name": "project.awtrix",
+  "fork": false,
+  "stargazers_count": 0
+ },
+ {
+  "name": "service",
+  "fork": true,
+  "stargazers_count": 0
+ },
+ {
+  "name": "simple-icons",
+  "fork": true,
+  "stargazers_count": 1
+ },
+ {
+  "name": "skills-hub",
+  "fork": true,
+  "stargazers_count": 0
+ },
+ {
+  "name": "techagenda",
+  "fork": false,
+  "stargazers_count": 24
+ },
+ {
+  "name": "techagenda-ui",
+  "fork": false,
+  "stargazers_count": 0
+ },
+ {
+  "name": "tips.projetos-opensource",
+  "fork": false,
+  "stargazers_count": 1
+ }
+]
