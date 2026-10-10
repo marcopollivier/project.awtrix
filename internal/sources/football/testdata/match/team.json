@@ -1,0 +1,4 @@
+{"team":{"nextEvent":[{"id":"999","date":"2026-10-10T21:00Z","competitions":[{"competitors":[
+ {"homeAway":"home","team":{"id":"3454","abbreviation":"VAS"}},
+ {"homeAway":"away","team":{"id":"4936","abbreviation":"REMO"}}],
+ "status":{"displayClock":"0'","period":0,"type":{"name":"STATUS_SCHEDULED","state":"pre"}}}]}]}}
