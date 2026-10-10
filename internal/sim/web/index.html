@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AWTRIX Simulator</title>
+<style>
+  :root {
+    --bg: #0e0f11; --panel: #17191c; --line: #2a2d32; --text: #e6e6e6; --muted: #8a8f98;
+    --accent: #00a2ff; --ok: #00d26a;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 system-ui, sans-serif; }
+  main { max-width: 1100px; margin: 0 auto; padding: 24px 16px 48px; }
+  header { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+  h1 { font-size: 18px; margin: 0; font-weight: 600; }
+  #status { width: 9px; height: 9px; border-radius: 50%; background: #c33; }
+  #status.ok { background: var(--ok); }
+  .device { background: linear-gradient(#232323, #161616); border-radius: 18px; padding: 22px 26px;
+            box-shadow: 0 10px 30px #0008, inset 0 1px 0 #ffffff14; overflow-x: auto; }
+  canvas { display: block; margin: 0 auto; max-width: 100%; height: auto; image-rendering: pixelated; }
+  .bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 14px 0 22px; }
+  button { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 8px;
+           padding: 7px 12px; cursor: pointer; font: inherit; }
+  button:hover { border-color: var(--accent); }
+  label { color: var(--muted); display: inline-flex; gap: 6px; align-items: center; }
+  #now { margin-left: auto; color: var(--muted); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px; min-width: 0; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 10px; }
+  ul { list-style: none; margin: 0; padding: 0; }
+  #loop li { display: grid; grid-template-columns: 140px 1fr auto; gap: 10px; padding: 6px 8px; border-radius: 6px; }
+  #loop li.current { background: #00a2ff22; }
+  #loop .name { font-family: ui-monospace, monospace; color: var(--muted); overflow: hidden; text-overflow: ellipsis; }
+  #loop .age { color: var(--muted); font-size: 12px; }
+  .muted { color: var(--muted); }
+  pre, code, textarea, input { font-family: ui-monospace, monospace; font-size: 12px; }
+  pre { margin: 0; white-space: pre-wrap; word-break: break-word; color: #b9c2cf; }
+  #log li { display: grid; grid-template-columns: 64px 120px 1fr; gap: 8px; padding: 3px 0; border-bottom: 1px solid var(--line); }
+  #log code { color: #b9c2cf; word-break: break-all; }
+  #log .time, #log .kind { color: var(--muted); }
+  textarea, input { width: 100%; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 8px; }
+  textarea { min-height: 90px; resize: vertical; }
+  .row { display: flex; gap: 8px; margin-top: 8px; align-items: center; }
+  @media (max-width: 600px) { #loop li { grid-template-columns: 1fr auto; } #loop .name { display: none; } }
+</style>
+</head>
+<body>
+<main>
+  <header><span id="status" title="conexão com o simulador"></span><h1>AWTRIX Simulator · Ulanzi TC001</h1></header>
+  <div class="device"><canvas id="matrix"></canvas></div>
+
+  <div class="bar">
+    <button id="next">Próximo app ⏭</button>
+    <button id="dismiss">Fechar notificação</button>
+    <button id="test">Testar gol ⚽</button>
+    <label><input type="checkbox" id="sound"> som</label>
+    <span id="now"></span>
+  </div>
+
+  <div class="grid">
+    <section><h2>Carrossel</h2><ul id="loop"></ul></section>
+    <section><h2>Payload em exibição</h2><pre id="payload">—</pre></section>
+    <section>
+      <h2>Enviar payload</h2>
+      <input id="appname" placeholder="nome do app (vazio = notificação)">
+      <textarea id="appjson">{"text":[{"t":"12.3K","c":"#FFFFFF"},{"t":" +18","c":"#00FF66"}],"icon":"5952","progress":46,"progressC":"#00A2FF"}</textarea>
+      <div class="row"><button id="send">Enviar</button><span id="sendstatus" class="muted"></span></div>
+    </section>
+    <section><h2>Requisições recebidas</h2><ul id="log"></ul></section>
+  </div>
+</main>
+<script type="module" src="matrix.js"></script>
+</body>
+</html>
