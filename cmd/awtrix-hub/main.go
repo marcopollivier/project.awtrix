@@ -3,6 +3,7 @@
 //
 //	awtrix-hub sim                     # simulator on http://localhost:7070
 //	awtrix-hub run [--sim]             # poll sources and update the targets
+//	awtrix-hub run --mock              # fake data for every source, in the simulator
 //	awtrix-hub preview                 # fetch every source once and exit
 //	awtrix-hub set linkedin 2890       # manual counters
 package main
@@ -26,6 +27,7 @@ import (
 
 	"github.com/marcopollivier/project.awtrix/internal/awtrix"
 	"github.com/marcopollivier/project.awtrix/internal/config"
+	"github.com/marcopollivier/project.awtrix/internal/mock"
 	"github.com/marcopollivier/project.awtrix/internal/scheduler"
 	"github.com/marcopollivier/project.awtrix/internal/sim"
 	"github.com/marcopollivier/project.awtrix/internal/sources"
@@ -155,7 +157,14 @@ func cmdRun(ctx context.Context, args []string, once bool) error {
 	fixture := fl.String("football-fixture", "", "diretório com um jogo gravado (ex.: internal/sources/football/testdata/match)")
 	only := fl.String("only", "", "roda só esta fonte (github, youtube, instagram, linkedin, football)")
 	debug := fl.Bool("debug", false, "logs detalhados")
+	useMock := fl.Bool("mock", false, "dados de mentira para todas as fontes (implica --sim; não toca no estado real)")
 	fl.Parse(args)
+	if *useMock {
+		*withSim = true
+		if *fixture == "" {
+			*fixture = defaultFixture
+		}
+	}
 	log := newLogger(*debug)
 
 	cfg, err := loadConfig(*cfgPath, log)
@@ -180,11 +189,19 @@ func cmdRun(ctx context.Context, args []string, once bool) error {
 		}
 	}
 
+	var mockURL string
+	if *useMock {
+		if mockURL, err = setupMock(ctx, cfg); err != nil {
+			return err
+		}
+		log.Info("modo mock: contadores sobem a cada 5s e batem metas em menos de 1 minuto")
+	}
+
 	st, err := state.Open(filepath.Join(cfg.DataDir, "state.json"))
 	if err != nil {
 		return err
 	}
-	srcs, err := buildSources(cfg, st, *fixture, *only, log)
+	srcs, err := buildSources(cfg, st, *fixture, *only, mockURL, log)
 	if err != nil {
 		return err
 	}
@@ -202,7 +219,33 @@ func cmdRun(ctx context.Context, args []string, once bool) error {
 	return ctx.Err()
 }
 
-func buildSources(cfg *config.Config, st *state.Store, fixture, only string, log *slog.Logger) ([]sources.Source, error) {
+const defaultFixture = "internal/sources/football/testdata/match"
+
+// setupMock points the config at fake APIs and a throwaway data dir.
+// It must run after the simulator started (the icon cache stays in the real dir).
+func setupMock(ctx context.Context, cfg *config.Config) (string, error) {
+	srv := mock.Server()
+	context.AfterFunc(ctx, srv.Close)
+
+	tmp, err := os.MkdirTemp("", "awtrix-hub-mock")
+	if err != nil {
+		return "", err
+	}
+	cfg.DataDir = tmp
+	if err := state.SetManual(manualPath(cfg), linkedin.Key, 2890, time.Now()); err != nil {
+		return "", err
+	}
+	sc := &cfg.Sources
+	sc.GitHub.Enabled, sc.GitHub.Interval = true, 5*time.Second
+	sc.YouTube.Enabled, sc.YouTube.Interval, sc.YouTube.APIKey = true, 5*time.Second, "mock"
+	sc.Instagram.Enabled, sc.Instagram.Interval = true, 5*time.Second
+	sc.Instagram.Token, sc.Instagram.UserID = "mock", "mock"
+	sc.LinkedIn.Enabled = true
+	sc.Football.Enabled = true
+	return srv.URL, nil
+}
+
+func buildSources(cfg *config.Config, st *state.Store, fixture, only, mockURL string, log *slog.Logger) ([]sources.Source, error) {
 	sc := cfg.Sources
 	enabled := func(name string, on bool) bool {
 		if only != "" {
@@ -212,20 +255,32 @@ func buildSources(cfg *config.Config, st *state.Store, fixture, only string, log
 	}
 	var srcs []sources.Source
 	if enabled("github", sc.GitHub.Enabled) {
-		srcs = append(srcs, github.New(sc.GitHub, cfg.Icon))
+		g := github.New(sc.GitHub, cfg.Icon)
+		if mockURL != "" {
+			g.BaseURL = mockURL + "/github"
+		}
+		srcs = append(srcs, g)
 	}
 	if enabled("youtube", sc.YouTube.Enabled) {
 		if sc.YouTube.APIKey == "" {
 			log.Warn("youtube habilitado mas YOUTUBE_API_KEY não definida; pulando")
 		} else {
-			srcs = append(srcs, youtube.New(sc.YouTube, cfg.Icon))
+			y := youtube.New(sc.YouTube, cfg.Icon)
+			if mockURL != "" {
+				y.BaseURL = mockURL + "/youtube"
+			}
+			srcs = append(srcs, y)
 		}
 	}
 	if enabled("instagram", sc.Instagram.Enabled) {
 		if sc.Instagram.Token == "" || sc.Instagram.UserID == "" {
 			log.Warn("instagram habilitado mas INSTAGRAM_TOKEN/INSTAGRAM_USER_ID não definidos; pulando")
 		} else {
-			srcs = append(srcs, instagram.New(sc.Instagram, cfg.Icon))
+			ig := instagram.New(sc.Instagram, cfg.Icon)
+			if mockURL != "" {
+				ig.BaseURL = mockURL + "/instagram"
+			}
+			srcs = append(srcs, ig)
 		}
 	}
 	if enabled("linkedin", sc.LinkedIn.Enabled) {

@@ -26,6 +26,7 @@ make dev                      # hub + simulador → http://localhost:7070
 | `make dev` | hub + simulador no mesmo processo (`run --sim`) |
 | `make run` | hub enviando para os `targets` da config |
 | `make preview` | consulta cada fonte uma vez, envia e sai |
+| `make mock` | **tudo com dados de mentira**: contadores subindo, metas, jogo do Vasco; sem chaves |
 | `make replay` | replay de um jogo do Vasco gravado (gols, intervalo, fim) no simulador |
 | `awtrix-hub set linkedin 2890` | atualiza o contador manual do LinkedIn |
 | `awtrix-hub run --only github --debug` | roda só uma fonte, com logs detalhados |

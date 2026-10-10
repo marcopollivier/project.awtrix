@@ -1,7 +1,7 @@
 BIN := bin/awtrix-hub
 FIXTURE := internal/sources/football/testdata/match
 
-.PHONY: build test sim run dev preview replay vet
+.PHONY: build test sim run dev mock preview replay vet
 
 build:
 	go build -o $(BIN) ./cmd/awtrix-hub
@@ -24,6 +24,10 @@ dev:
 
 preview:
 	go run ./cmd/awtrix-hub preview
+
+# tudo com dados de mentira (sem chaves, sem tocar no estado real)
+mock:
+	go run ./cmd/awtrix-hub run --mock
 
 # replay de um jogo do Vasco (gols, intervalo, fim) no simulador
 replay:
