@@ -1,0 +1,66 @@
+# Copie para config.yaml e ajuste. Segredos ficam no .env (veja .env.example).
+
+# Para onde enviar: simulador, relógio, ou os dois (espelhado).
+targets:
+  - http://localhost:7070          # simulador (awtrix-hub sim)
+  # - http://192.168.0.50          # relógio com AWTRIX 3 (depois do flash)
+
+timezone: America/Sao_Paulo
+data_dir: ~/.awtrix-hub            # state.json, manual.json, cache de ícones
+
+defaults:
+  duration: 7                      # segundos de cada app na tela
+  lifetime: 3600                   # app some do relógio se ficar 1h sem atualização (Mac dormindo)
+
+sim:
+  addr: localhost:7070
+
+# Ícones da LaMetric (https://developer.lametric.com/icons) — o simulador e o relógio baixam pelo ID.
+icons:
+  github: "2799"
+  stars: "9459"
+  youtube: "5952"
+  instagram: "1644"
+  linkedin: "32288"
+  football: "26316"
+  goal: "8530"
+  party: "9554"
+
+colors:
+  text: "#FFFFFF"
+  up: "#00FF66"
+  down: "#FF3333"
+  bar: "#00A2FF"
+
+sources:
+  github:
+    enabled: true
+    user: marcopollivier
+    interval: 30m
+    milestones: { step: 100 }       # comemora 800, 900, 1000...
+    stars_milestones: { step: 50 }
+
+  youtube:
+    enabled: true                   # precisa de YOUTUBE_API_KEY no .env
+    handle: omarcodev
+    interval: 15m
+    latest_video_window: 48h        # mostra views do último vídeo por 48h após publicar
+    milestones: { step: 1000 }
+
+  instagram:
+    enabled: false                  # precisa de INSTAGRAM_USER_ID e INSTAGRAM_TOKEN no .env
+    interval: 30m
+    graph_version: v21.0
+    milestones: { step: 500 }
+
+  linkedin:
+    enabled: true                   # valor manual: awtrix-hub set linkedin 2890
+    stale_after: 720h               # fica cinza se não for atualizado em 30 dias
+    milestones: { step: 500 }
+
+  football:
+    enabled: true
+    team_id: "3454"                 # Vasco da Gama na ESPN
+    abbrev: VAS
+    name: VASCO
+    leagues: [bra.1, bra.copa_do_brazil, conmebol.sudamericana, conmebol.libertadores, bra.camp.carioca]
