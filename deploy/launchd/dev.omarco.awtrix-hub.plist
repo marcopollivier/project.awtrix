@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Inicia o awtrix-hub no login e reinicia se cair.
+  Ajuste os caminhos (REPO) e instale com:
+    make build
+    cp deploy/launchd/dev.omarco.awtrix-hub.plist ~/Library/LaunchAgents/
+    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/dev.omarco.awtrix-hub.plist
+  Para parar:
+    launchctl bootout gui/$(id -u)/dev.omarco.awtrix-hub
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>dev.omarco.awtrix-hub</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/mollivier/dev/marcopollivier/project.awtrix/bin/awtrix-hub</string>
+    <string>run</string>
+    <string>--config</string>
+    <string>/Users/mollivier/dev/marcopollivier/project.awtrix/config.yaml</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>/Users/mollivier/dev/marcopollivier/project.awtrix</string>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>ThrottleInterval</key>
+  <integer>30</integer>
+  <key>StandardOutPath</key>
+  <string>/Users/mollivier/Library/Logs/awtrix-hub.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/mollivier/Library/Logs/awtrix-hub.log</string>
+</dict>
+</plist>

@@ -1,0 +1,281 @@
+// Command awtrix-hub feeds an AWTRIX 3 clock (Ulanzi TC001) with social counters
+// and live football, and ships a browser simulator of the clock.
+//
+//	awtrix-hub sim                     # simulator on http://localhost:7070
+//	awtrix-hub run [--sim]             # poll sources and update the targets
+//	awtrix-hub preview                 # fetch every source once and exit
+//	awtrix-hub set linkedin 2890       # manual counters
+package main
+
+import (
+	"context"
+	"errors"
+	"flag"
+	"fmt"
+	"io/fs"
+	"log/slog"
+	"net"
+	"net/http"
+	"os"
+	"os/signal"
+	"path/filepath"
+	"slices"
+	"strconv"
+	"syscall"
+	"time"
+
+	"github.com/marcopollivier/project.awtrix/internal/awtrix"
+	"github.com/marcopollivier/project.awtrix/internal/config"
+	"github.com/marcopollivier/project.awtrix/internal/scheduler"
+	"github.com/marcopollivier/project.awtrix/internal/sim"
+	"github.com/marcopollivier/project.awtrix/internal/sources"
+	"github.com/marcopollivier/project.awtrix/internal/sources/football"
+	"github.com/marcopollivier/project.awtrix/internal/sources/github"
+	"github.com/marcopollivier/project.awtrix/internal/sources/instagram"
+	"github.com/marcopollivier/project.awtrix/internal/sources/linkedin"
+	"github.com/marcopollivier/project.awtrix/internal/sources/youtube"
+	"github.com/marcopollivier/project.awtrix/internal/state"
+)
+
+var version = "dev"
+
+const usage = `uso: awtrix-hub <comando> [flags]
+
+comandos:
+  sim       inicia o simulador web do relógio
+  run       consulta as fontes e atualiza o relógio/simulador
+  preview   consulta cada fonte uma vez, envia e sai
+  set       grava um contador manual (ex.: set linkedin 2890)
+  version   mostra a versão
+`
+
+func main() {
+	if len(os.Args) < 2 {
+		fmt.Fprint(os.Stderr, usage)
+		os.Exit(2)
+	}
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer cancel()
+
+	var err error
+	switch cmd, args := os.Args[1], os.Args[2:]; cmd {
+	case "sim":
+		err = cmdSim(ctx, args)
+	case "run":
+		err = cmdRun(ctx, args, false)
+	case "preview":
+		err = cmdRun(ctx, args, true)
+	case "set":
+		err = cmdSet(args)
+	case "version":
+		fmt.Println(version)
+	default:
+		fmt.Fprint(os.Stderr, usage)
+		os.Exit(2)
+	}
+	if err != nil && !errors.Is(err, context.Canceled) {
+		fmt.Fprintln(os.Stderr, "erro:", err)
+		os.Exit(1)
+	}
+}
+
+func newLogger(debug bool) *slog.Logger {
+	level := slog.LevelInfo
+	if debug {
+		level = slog.LevelDebug
+	}
+	return slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: level}))
+}
+
+// loadConfig reads the file if it exists; without one, defaults are fine for the simulator.
+func loadConfig(path string, log *slog.Logger) (*config.Config, error) {
+	cfg, err := config.Load(path)
+	if errors.Is(err, fs.ErrNotExist) {
+		log.Warn("config não encontrada, usando padrões", "path", path)
+		cfg = config.Default()
+		if err := cfg.Finish(); err != nil {
+			return nil, err
+		}
+		return cfg, nil
+	}
+	return cfg, err
+}
+
+func cmdSim(ctx context.Context, args []string) error {
+	fl := flag.NewFlagSet("sim", flag.ExitOnError)
+	cfgPath := fl.String("config", "config.yaml", "arquivo de configuração")
+	addr := fl.String("addr", "", "endereço (padrão: sim.addr da config)")
+	fl.Parse(args)
+	log := newLogger(false)
+	cfg, err := loadConfig(*cfgPath, log)
+	if err != nil {
+		return err
+	}
+	if *addr == "" {
+		*addr = cfg.Sim.Addr
+	}
+	return serveSim(ctx, cfg, *addr, log, nil)
+}
+
+// serveSim blocks until ctx ends. ready (optional) is closed once listening.
+func serveSim(ctx context.Context, cfg *config.Config, addr string, log *slog.Logger, ready chan<- struct{}) error {
+	s := sim.New(log.With("component", "sim"), filepath.Join(cfg.DataDir, "icons"))
+	ln, err := net.Listen("tcp", addr)
+	if err != nil {
+		return err
+	}
+	srv := &http.Server{Handler: s.Handler(), ReadHeaderTimeout: 5 * time.Second}
+	stop := make(chan struct{})
+	go s.Run(stop)
+	go func() {
+		<-ctx.Done()
+		close(stop)
+		shutdown, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		srv.Shutdown(shutdown)
+	}()
+	log.Info("simulador no ar", "url", "http://"+ln.Addr().String())
+	if ready != nil {
+		close(ready)
+	}
+	if err := srv.Serve(ln); !errors.Is(err, http.ErrServerClosed) {
+		return err
+	}
+	return ctx.Err()
+}
+
+func cmdRun(ctx context.Context, args []string, once bool) error {
+	name := "run"
+	if once {
+		name = "preview"
+	}
+	fl := flag.NewFlagSet(name, flag.ExitOnError)
+	cfgPath := fl.String("config", "config.yaml", "arquivo de configuração")
+	withSim := fl.Bool("sim", false, "sobe o simulador junto e envia para ele também")
+	fixture := fl.String("football-fixture", "", "diretório com um jogo gravado (ex.: internal/sources/football/testdata/match)")
+	only := fl.String("only", "", "roda só esta fonte (github, youtube, instagram, linkedin, football)")
+	debug := fl.Bool("debug", false, "logs detalhados")
+	fl.Parse(args)
+	log := newLogger(*debug)
+
+	cfg, err := loadConfig(*cfgPath, log)
+	if err != nil {
+		return err
+	}
+	if *withSim {
+		ready := make(chan struct{})
+		go func() {
+			if err := serveSim(ctx, cfg, cfg.Sim.Addr, log, ready); err != nil && !errors.Is(err, context.Canceled) {
+				log.Error("simulador", "err", err)
+			}
+		}()
+		select {
+		case <-ready:
+		case <-time.After(2 * time.Second):
+			return fmt.Errorf("simulador não subiu em %s", cfg.Sim.Addr)
+		}
+		simURL := "http://" + cfg.Sim.Addr
+		if !slices.Contains(cfg.Targets, simURL) {
+			cfg.Targets = append(cfg.Targets, simURL)
+		}
+	}
+
+	st, err := state.Open(filepath.Join(cfg.DataDir, "state.json"))
+	if err != nil {
+		return err
+	}
+	srcs, err := buildSources(cfg, st, *fixture, *only, log)
+	if err != nil {
+		return err
+	}
+	if len(srcs) == 0 {
+		return errors.New("nenhuma fonte habilitada")
+	}
+	client := awtrix.NewClient(cfg.Targets, log.With("component", "awtrix"))
+	sched := scheduler.New(cfg, client, st, log, srcs...)
+	log.Info("enviando para", "targets", cfg.Targets)
+	if once {
+		sched.RunOnce(ctx)
+		return nil
+	}
+	sched.Run(ctx)
+	return ctx.Err()
+}
+
+func buildSources(cfg *config.Config, st *state.Store, fixture, only string, log *slog.Logger) ([]sources.Source, error) {
+	sc := cfg.Sources
+	enabled := func(name string, on bool) bool {
+		if only != "" {
+			return name == only
+		}
+		return on
+	}
+	var srcs []sources.Source
+	if enabled("github", sc.GitHub.Enabled) {
+		srcs = append(srcs, github.New(sc.GitHub, cfg.Icon))
+	}
+	if enabled("youtube", sc.YouTube.Enabled) {
+		if sc.YouTube.APIKey == "" {
+			log.Warn("youtube habilitado mas YOUTUBE_API_KEY não definida; pulando")
+		} else {
+			srcs = append(srcs, youtube.New(sc.YouTube, cfg.Icon))
+		}
+	}
+	if enabled("instagram", sc.Instagram.Enabled) {
+		if sc.Instagram.Token == "" || sc.Instagram.UserID == "" {
+			log.Warn("instagram habilitado mas INSTAGRAM_TOKEN/INSTAGRAM_USER_ID não definidos; pulando")
+		} else {
+			srcs = append(srcs, instagram.New(sc.Instagram, cfg.Icon))
+		}
+	}
+	if enabled("linkedin", sc.LinkedIn.Enabled) {
+		srcs = append(srcs, linkedin.New(sc.LinkedIn, cfg.Icon, manualPath(cfg)))
+	}
+	if enabled("football", sc.Football.Enabled) || fixture != "" {
+		f := football.New(sc.Football, cfg.Icon, st, cfg.Location)
+		if fixture != "" {
+			srv, err := football.FixtureServer(fixture, time.Now().Add(2*time.Minute))
+			if err != nil {
+				return nil, err
+			}
+			// The replay uses its own state so it never pollutes the real one.
+			tmp, err := os.MkdirTemp("", "awtrix-hub-fixture")
+			if err != nil {
+				return nil, err
+			}
+			fst, err := state.Open(filepath.Join(tmp, "state.json"))
+			if err != nil {
+				return nil, err
+			}
+			f = football.New(sc.Football, cfg.Icon, fst, cfg.Location)
+			f.BaseURL, f.Fast = srv.URL, true
+			log.Info("futebol em modo replay", "fixture", fixture)
+		}
+		srcs = append(srcs, f)
+	}
+	return srcs, nil
+}
+
+func cmdSet(args []string) error {
+	fl := flag.NewFlagSet("set", flag.ExitOnError)
+	cfgPath := fl.String("config", "config.yaml", "arquivo de configuração")
+	fl.Parse(args)
+	if fl.NArg() != 2 || fl.Arg(0) != linkedin.Key {
+		return errors.New("uso: awtrix-hub set linkedin <seguidores>")
+	}
+	v, err := strconv.ParseInt(fl.Arg(1), 10, 64)
+	if err != nil || v < 0 {
+		return fmt.Errorf("valor inválido: %q", fl.Arg(1))
+	}
+	cfg, err := loadConfig(*cfgPath, newLogger(false))
+	if err != nil {
+		return err
+	}
+	if err := state.SetManual(manualPath(cfg), fl.Arg(0), v, time.Now()); err != nil {
+		return err
+	}
+	fmt.Printf("%s = %d (aparece no relógio em até 1 minuto se o run estiver rodando)\n", fl.Arg(0), v)
+	return nil
+}
+
+func manualPath(cfg *config.Config) string { return filepath.Join(cfg.DataDir, "manual.json") }
