@@ -56,7 +56,7 @@ func (ic *Icons) Get(ctx context.Context, id string) (*Icon, error) {
 	if cached != nil {
 		return cached, nil
 	}
-	raw, err := ic.raw(ctx, id)
+	raw, err := ic.Raw(ctx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -70,8 +70,11 @@ func (ic *Icons) Get(ctx context.Context, id string) (*Icon, error) {
 	return icon, nil
 }
 
-// raw returns the icon bytes from the disk cache or LaMetric.
-func (ic *Icons) raw(ctx context.Context, id string) ([]byte, error) {
+// Raw returns the icon bytes (GIF or PNG) from the disk cache or LaMetric.
+func (ic *Icons) Raw(ctx context.Context, id string) ([]byte, error) {
+	if !validID.MatchString(id) {
+		return nil, fmt.Errorf("invalid icon id %q", id)
+	}
 	path := filepath.Join(ic.dir, id)
 	if b, err := os.ReadFile(path); err == nil {
 		return b, nil

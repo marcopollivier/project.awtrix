@@ -28,6 +28,7 @@ make dev                      # hub + simulador → http://localhost:7070
 | `make preview` | consulta cada fonte uma vez, envia e sai |
 | `make mock` | **tudo com dados de mentira**: contadores subindo, metas, jogo do Vasco; sem chaves |
 | `make replay` | replay de um jogo do Vasco gravado (gols, intervalo, fim) no simulador |
+| `awtrix-hub icons` | envia os ícones da config para o relógio (o `run` também faz isso ao iniciar) |
 | `awtrix-hub set linkedin 2890` | atualiza o contador manual do LinkedIn |
 | `awtrix-hub run --only github --debug` | roda só uma fonte, com logs detalhados |
 | `make test` | testes |
@@ -43,11 +44,11 @@ Estado (variação do dia, metas já comemoradas, último placar) fica em `~/.aw
 - **Enviar payload**: teste qualquer JSON da [API do AWTRIX](https://blueforcer.github.io/awtrix3/#/api) (nome vazio = notificação);
 - **Som**: marque a caixa para ouvir os toques RTTTL (o buzzer do relógio).
 
-Ele aceita os mesmos endpoints do relógio, então dá para testar com `curl`:
+Ele aceita os mesmos endpoints do relógio, então dá para testar com `curl`. O relógio exige o cabeçalho `Content-Type: application/json`; sem ele, responde `ErrorParsingJson`:
 
 ```sh
-curl -X POST 'localhost:7070/api/custom?name=teste' -d '{"text":"OLA","icon":"2799"}'
-curl -X POST localhost:7070/api/notify -d '{"text":"GOOOL","rainbow":true,"repeat":1}'
+curl -X POST -H 'Content-Type: application/json' 'localhost:7070/api/custom?name=teste' -d '{"text":"OLA","icon":"2799"}'
+curl -X POST -H 'Content-Type: application/json' localhost:7070/api/notify -d '{"text":"GOOOL","rainbow":true,"repeat":1}'
 ```
 
 A fonte e o tempo de rolagem são aproximações do relógio. Ajuste comparando lado a lado quando o aparelho estiver com AWTRIX 3 (coloque os dois em `targets`).
@@ -104,6 +105,7 @@ O último placar fica salvo, então reiniciar o hub no meio do jogo não repete 
 4. Se a porta não aparecer, rode `ls /dev/cu.*`. Quase sempre o problema é o cabo.
 5. Na interface web do relógio, desligue os apps nativos que não quiser e ajuste o brilho.
 6. Coloque `http://<ip>` em `targets` no `config.yaml`.
+7. Rode `awtrix-hub icons`. O AWTRIX não baixa ícones sozinho: eles precisam estar na pasta `/ICONS` do relógio, em GIF ou JPG. O comando baixa os ícones da LaMetric, converte de PNG para GIF quando precisa e envia. O `run` faz o mesmo ao iniciar.
 
 ## Rodando sempre (launchd)
 

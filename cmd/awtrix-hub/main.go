@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"io/fs"
 	"log/slog"
+	"maps"
 	"net"
 	"net/http"
 	"os"
@@ -48,6 +49,7 @@ comandos:
   run       consulta as fontes e atualiza o relógio/simulador
   preview   consulta cada fonte uma vez, envia e sai
   set       grava um contador manual (ex.: set linkedin 2890)
+  icons     envia os ícones da config para o relógio (o AWTRIX não baixa sozinho)
   version   mostra a versão
 `
 
@@ -69,6 +71,8 @@ func main() {
 		err = cmdRun(ctx, args, true)
 	case "set":
 		err = cmdSet(args)
+	case "icons":
+		err = cmdIcons(ctx, args)
 	case "version":
 		fmt.Println(version)
 	default:
@@ -209,6 +213,9 @@ func cmdRun(ctx context.Context, args []string, once bool) error {
 		return errors.New("nenhuma fonte habilitada")
 	}
 	client := awtrix.NewClient(cfg.Targets, log.With("component", "awtrix"))
+	if err := syncIcons(ctx, cfg, client, log, false); err != nil {
+		log.Warn("ícones não sincronizados", "err", err)
+	}
 	sched := scheduler.New(cfg, client, st, log, srcs...)
 	log.Info("enviando para", "targets", cfg.Targets)
 	if once {
@@ -331,6 +338,58 @@ func cmdSet(args []string) error {
 	}
 	fmt.Printf("%s = %d (aparece no relógio em até 1 minuto se o run estiver rodando)\n", fl.Arg(0), v)
 	return nil
+}
+
+func cmdIcons(ctx context.Context, args []string) error {
+	fl := flag.NewFlagSet("icons", flag.ExitOnError)
+	cfgPath := fl.String("config", "config.yaml", "arquivo de configuração")
+	force := fl.Bool("force", false, "reenvia mesmo os ícones que já estão no relógio")
+	fl.Parse(args)
+	log := newLogger(false)
+	cfg, err := loadConfig(*cfgPath, log)
+	if err != nil {
+		return err
+	}
+	return syncIcons(ctx, cfg, awtrix.NewClient(cfg.Targets, log), log, *force)
+}
+
+// syncIcons uploads the configured LaMetric icons to every target that has a
+// file manager (the real clock); the simulator fetches icons by itself.
+func syncIcons(ctx context.Context, cfg *config.Config, client *awtrix.Client, log *slog.Logger, force bool) error {
+	ids := slices.Sorted(maps.Values(cfg.Icons))
+	ids = slices.Compact(ids)
+	lametric := sim.NewIcons(filepath.Join(cfg.DataDir, "icons"))
+	var errs []error
+	for _, target := range client.Targets() {
+		have, ok, err := client.Icons(ctx, target)
+		if err != nil {
+			log.Warn("target fora do ar, ícones não verificados", "target", target, "err", err)
+			continue
+		}
+		if !ok {
+			continue // simulator
+		}
+		sent := 0
+		for _, id := range ids {
+			if !force && (slices.Contains(have, id+".gif") || slices.Contains(have, id+".jpg")) {
+				continue
+			}
+			raw, err := lametric.Raw(ctx, id)
+			if err == nil {
+				var data []byte
+				if data, err = awtrix.IconGIF(raw); err == nil {
+					err = client.UploadIcon(ctx, target, id, data)
+				}
+			}
+			if err != nil {
+				errs = append(errs, fmt.Errorf("%s ícone %s: %w", target, id, err))
+				continue
+			}
+			sent++
+		}
+		log.Info("ícones no relógio", "target", target, "enviados", sent, "total", len(ids))
+	}
+	return errors.Join(errs...)
 }
 
 func manualPath(cfg *config.Config) string { return filepath.Join(cfg.DataDir, "manual.json") }
