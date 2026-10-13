@@ -77,8 +77,7 @@ type Instagram struct {
 	Interval   time.Duration `yaml:"interval"`
 	Milestones Milestones    `yaml:"milestones"`
 	GraphVer   string        `yaml:"graph_version"`
-	UserID     string        `yaml:"-"` // INSTAGRAM_USER_ID
-	Token      string        `yaml:"-"` // INSTAGRAM_TOKEN
+	Token      string        `yaml:"-"` // INSTAGRAM_TOKEN (seed; refreshed copies live in data_dir)
 }
 
 type LinkedIn struct {
@@ -111,7 +110,6 @@ func Load(path string) (*Config, error) {
 	}
 	c.Sources.GitHub.Token = os.Getenv("GITHUB_TOKEN")
 	c.Sources.YouTube.APIKey = os.Getenv("YOUTUBE_API_KEY")
-	c.Sources.Instagram.UserID = os.Getenv("INSTAGRAM_USER_ID")
 	c.Sources.Instagram.Token = os.Getenv("INSTAGRAM_TOKEN")
 	return c, c.Finish()
 }
@@ -134,7 +132,7 @@ func Default() *Config {
 		Sources: Sources{
 			GitHub:    GitHub{Interval: 30 * time.Minute},
 			YouTube:   YouTube{Interval: 15 * time.Minute, LatestWindow: 48 * time.Hour},
-			Instagram: Instagram{Interval: 30 * time.Minute, GraphVer: "v21.0"},
+			Instagram: Instagram{Interval: 30 * time.Minute, GraphVer: "v26.0"},
 			LinkedIn:  LinkedIn{StaleAfter: 30 * 24 * time.Hour},
 			Football:  Football{TeamID: "3454", Abbrev: "VAS", Name: "VASCO", Leagues: []string{"bra.1"}},
 		},

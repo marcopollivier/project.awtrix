@@ -52,7 +52,7 @@ func Server() *httptest.Server {
 	mux.HandleFunc("GET /youtube/videos", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, `{"items":[{"statistics":{"viewCount":"%d"}}]}`, views.next())
 	})
-	mux.HandleFunc("GET /instagram/{id}", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /instagram/{ver}/me", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, `{"followers_count":%d}`, insta.next())
 	})
 	return httptest.NewServer(mux)

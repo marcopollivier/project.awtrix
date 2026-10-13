@@ -246,7 +246,7 @@ func setupMock(ctx context.Context, cfg *config.Config) (string, error) {
 	sc.GitHub.Enabled, sc.GitHub.Interval = true, 5*time.Second
 	sc.YouTube.Enabled, sc.YouTube.Interval, sc.YouTube.APIKey = true, 5*time.Second, "mock"
 	sc.Instagram.Enabled, sc.Instagram.Interval = true, 5*time.Second
-	sc.Instagram.Token, sc.Instagram.UserID = "mock", "mock"
+	sc.Instagram.Token = "mock"
 	sc.LinkedIn.Enabled = true
 	sc.Football.Enabled = true
 	return srv.URL, nil
@@ -280,10 +280,10 @@ func buildSources(cfg *config.Config, st *state.Store, fixture, only, mockURL st
 		}
 	}
 	if enabled("instagram", sc.Instagram.Enabled) {
-		if sc.Instagram.Token == "" || sc.Instagram.UserID == "" {
-			log.Warn("instagram habilitado mas INSTAGRAM_TOKEN/INSTAGRAM_USER_ID não definidos; pulando")
+		if sc.Instagram.Token == "" {
+			log.Warn("instagram habilitado mas INSTAGRAM_TOKEN não definido; pulando")
 		} else {
-			ig := instagram.New(sc.Instagram, cfg.Icon)
+			ig := instagram.New(sc.Instagram, cfg.Icon, filepath.Join(cfg.DataDir, "instagram_token.json"))
 			if mockURL != "" {
 				ig.BaseURL = mockURL + "/instagram"
 			}

@@ -59,7 +59,7 @@ A fonte e o tempo de rolagem são aproximações do relógio. Ajuste comparando 
 |---|---|---|
 | GitHub | nada (`GITHUB_TOKEN` opcional) | seguidores e soma de ⭐ dos repositórios próprios (sem forks) |
 | YouTube | `YOUTUBE_API_KEY` | inscritos vêm **arredondados** pela API pública (3 dígitos significativos); views do último vídeo nas primeiras 48h |
-| Instagram | `INSTAGRAM_USER_ID`, `INSTAGRAM_TOKEN` | conta profissional; avisa no relógio se o token expirar |
+| Instagram | `INSTAGRAM_TOKEN` | conta profissional, login do Instagram; o hub renova o token sozinho |
 | LinkedIn | nada | sem API para perfil pessoal: valor manual via `set` |
 | Futebol | nada | API não oficial da ESPN; Vasco = time `3454`; consulta a cada 30s só durante o jogo |
 
@@ -74,12 +74,15 @@ Custo: cerca de 3 unidades por consulta, de uma cota diária de 10.000.
 
 ### Token do Instagram
 
-1. A conta precisa ser **profissional** e estar vinculada a uma **Página do Facebook**.
-2. [developers.facebook.com](https://developers.facebook.com) → crie um app (tipo *Business*) e adicione o produto **Instagram Graph API**.
-3. No **Graph API Explorer**, gere um *User Token* com `instagram_basic`, `pages_show_list` e `pages_read_engagement`.
-4. Troque por um token de longa duração e então pegue o **token da Página** (`GET /me/accounts`), que não expira.
-5. `GET /{page-id}?fields=instagram_business_account` → este é o `INSTAGRAM_USER_ID`.
-6. Coloque em `.env`: `INSTAGRAM_USER_ID=...` e `INSTAGRAM_TOKEN=...`, e habilite em `config.yaml`.
+Usa a **API do Instagram com login do Instagram** (`graph.instagram.com`), que não precisa de Página do Facebook.
+
+1. A conta precisa ser **profissional** (Criador ou Empresa).
+2. Em [developers.facebook.com](https://developers.facebook.com) → *My Apps* → *Create app*, escolha o caso de uso do Instagram (gerenciar mensagens e conteúdo) e o tipo *Business*.
+3. No painel do app: *Instagram* → *API setup with Instagram login* → *Generate access tokens* → *Add account*, entre com a conta e autorize (`instagram_business_basic`).
+4. Se a Meta pedir, aceite o convite de testador no app do Instagram (*Configurações → Apps e sites → Convites de testador*).
+5. Clique em *Generate token*, copie o token de longa duração e coloque no `.env`: `INSTAGRAM_TOKEN=...`
+
+O token vale 60 dias. O hub renova o token toda semana e guarda o novo em `~/.awtrix-hub/instagram_token.json`, então o do `.env` só serve de ponto de partida. Trocar o token no `.env` faz o hub recomeçar a partir dele. Se o token ficar inválido, o relógio mostra `TOKEN INSTAGRAM INVALIDO` uma vez por dia.
 
 ### Futebol
 

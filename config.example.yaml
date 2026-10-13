@@ -50,9 +50,9 @@ sources:
     milestones: { step: 100 }
 
   instagram:
-    enabled: false                  # precisa de INSTAGRAM_USER_ID e INSTAGRAM_TOKEN no .env
+    enabled: true                   # precisa de INSTAGRAM_TOKEN no .env (login do Instagram; o hub renova sozinho)
     interval: 30m
-    graph_version: v21.0
+    graph_version: v26.0
     milestones: { step: 500 }
 
   linkedin:
