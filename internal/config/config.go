@@ -123,7 +123,7 @@ func Default() *Config {
 		Colors:   Colors{Text: "#FFFFFF", Up: "#00FF66", Down: "#FF3333", Bar: "#00A2FF"},
 		Sim:      Sim{Addr: "localhost:7070"},
 		Icons: map[string]string{
-			"github": "2799", "stars": "9459", "youtube": "5952", "instagram": "1644",
+			"github": "21802", "stars": "9459", "youtube": "5952", "instagram": "1644",
 			"linkedin": "32288", "football": "26316", "goal": "8530", "party": "9554",
 		},
 		Sources: Sources{
