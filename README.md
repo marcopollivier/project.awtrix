@@ -105,7 +105,7 @@ O último placar fica salvo, então reiniciar o hub no meio do jogo não repete 
 4. Se a porta não aparecer, rode `ls /dev/cu.*`. Quase sempre o problema é o cabo.
 5. Na interface web do relógio, desligue os apps nativos que não quiser e ajuste o brilho.
 6. Coloque `http://<ip>` em `targets` no `config.yaml`.
-7. Rode `awtrix-hub icons`. O AWTRIX não baixa ícones sozinho: eles precisam estar na pasta `/ICONS` do relógio, em GIF ou JPG. O comando baixa os ícones da LaMetric, converte de PNG para GIF quando precisa e envia. O `run` faz o mesmo ao iniciar.
+7. Rode `awtrix-hub icons`. Além dos IDs da LaMetric, a config aceita ícones próprios: um GIF 8×8 em `icons/` (ex.: `icons/gh_stars.gif`, o Octocat com estrela) referenciado pelo nome (`stars: "gh_stars"`). O AWTRIX não baixa ícones sozinho: eles precisam estar na pasta `/ICONS` do relógio, em GIF ou JPG. O comando baixa os ícones da LaMetric, converte de PNG para GIF quando precisa e envia. O `run` faz o mesmo ao iniciar.
 
 ## Rodando sempre (launchd)
 

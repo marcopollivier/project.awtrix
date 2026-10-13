@@ -15,10 +15,12 @@ defaults:
 sim:
   addr: localhost:7070
 
-# Ícones da LaMetric (https://developer.lametric.com/icons) — o simulador e o relógio baixam pelo ID.
+# Ícones: ID da LaMetric (https://developer.lametric.com/icons) ou nome de um GIF 8x8 em icons_dir.
+# `awtrix-hub icons` (e o run ao iniciar) envia todos para o relógio.
+icons_dir: icons
 icons:
   github: "21802"
-  stars: "9459"
+  stars: "gh_stars"               # ícone próprio: icons/gh_stars.gif
   youtube: "5952"
   instagram: "1644"
   linkedin: "32288"

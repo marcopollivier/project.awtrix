@@ -125,7 +125,7 @@ func cmdSim(ctx context.Context, args []string) error {
 
 // serveSim blocks until ctx ends. ready (optional) is closed once listening.
 func serveSim(ctx context.Context, cfg *config.Config, addr string, log *slog.Logger, ready chan<- struct{}) error {
-	s := sim.New(log.With("component", "sim"), filepath.Join(cfg.DataDir, "icons"))
+	s := sim.New(log.With("component", "sim"), filepath.Join(cfg.DataDir, "icons"), cfg.IconsDir)
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
 		return err
@@ -353,12 +353,13 @@ func cmdIcons(ctx context.Context, args []string) error {
 	return syncIcons(ctx, cfg, awtrix.NewClient(cfg.Targets, log), log, *force)
 }
 
-// syncIcons uploads the configured LaMetric icons to every target that has a
-// file manager (the real clock); the simulator fetches icons by itself.
+// syncIcons uploads the configured icons (LaMetric ids or project icons from
+// icons_dir) to every target that has a file manager (the real clock); the
+// simulator loads icons by itself.
 func syncIcons(ctx context.Context, cfg *config.Config, client *awtrix.Client, log *slog.Logger, force bool) error {
 	ids := slices.Sorted(maps.Values(cfg.Icons))
 	ids = slices.Compact(ids)
-	lametric := sim.NewIcons(filepath.Join(cfg.DataDir, "icons"))
+	lametric := sim.NewIcons(filepath.Join(cfg.DataDir, "icons"), cfg.IconsDir)
 	var errs []error
 	for _, target := range client.Targets() {
 		have, ok, err := client.Icons(ctx, target)

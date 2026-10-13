@@ -21,7 +21,10 @@ import (
 // LaMetric icons, the same catalog AWTRIX downloads from.
 const iconURL = "https://developer.lametric.com/content/apps/icon_thumbs/"
 
-var validID = regexp.MustCompile(`^[0-9]{1,7}$`)
+var (
+	lametricID = regexp.MustCompile(`^[0-9]{1,7}$`)
+	validID    = regexp.MustCompile(`^[a-z0-9_-]{1,32}$`) // also custom icons, e.g. "gh_stars"
+)
 
 // Icon is decoded server-side so the browser just paints pixels.
 type Icon struct {
@@ -36,14 +39,15 @@ type Frame struct {
 }
 
 type Icons struct {
-	dir  string
-	http *http.Client
-	mu   sync.Mutex
-	mem  map[string]*Icon
+	dir    string // cache of LaMetric downloads
+	custom string // project icons (<name>.gif), take precedence over LaMetric
+	http   *http.Client
+	mu     sync.Mutex
+	mem    map[string]*Icon
 }
 
-func NewIcons(dir string) *Icons {
-	return &Icons{dir: dir, http: &http.Client{Timeout: 30 * time.Second}, mem: map[string]*Icon{}}
+func NewIcons(dir, custom string) *Icons {
+	return &Icons{dir: dir, custom: custom, http: &http.Client{Timeout: 30 * time.Second}, mem: map[string]*Icon{}}
 }
 
 func (ic *Icons) Get(ctx context.Context, id string) (*Icon, error) {
@@ -70,10 +74,18 @@ func (ic *Icons) Get(ctx context.Context, id string) (*Icon, error) {
 	return icon, nil
 }
 
-// Raw returns the icon bytes (GIF or PNG) from the disk cache or LaMetric.
+// Raw returns the icon bytes (GIF or PNG): a project icon, the disk cache or LaMetric.
 func (ic *Icons) Raw(ctx context.Context, id string) ([]byte, error) {
 	if !validID.MatchString(id) {
 		return nil, fmt.Errorf("invalid icon id %q", id)
+	}
+	if ic.custom != "" {
+		if b, err := os.ReadFile(filepath.Join(ic.custom, id+".gif")); err == nil {
+			return b, nil
+		}
+	}
+	if !lametricID.MatchString(id) {
+		return nil, fmt.Errorf("icon %q: not in %s and not a LaMetric id", id, ic.custom)
 	}
 	path := filepath.Join(ic.dir, id)
 	if b, err := os.ReadFile(path); err == nil {

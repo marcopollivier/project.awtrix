@@ -29,8 +29,8 @@ type Server struct {
 	clients map[chan []byte]struct{}
 }
 
-func New(log *slog.Logger, iconDir string) *Server {
-	s := &Server{log: log, icons: NewIcons(iconDir), clients: map[chan []byte]struct{}{}}
+func New(log *slog.Logger, iconCache, customIcons string) *Server {
+	s := &Server{log: log, icons: NewIcons(iconCache, customIcons), clients: map[chan []byte]struct{}{}}
 	s.disp = NewDisplay(s.broadcast)
 	return s
 }

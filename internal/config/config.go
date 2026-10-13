@@ -18,6 +18,7 @@ type Config struct {
 	DataDir  string            `yaml:"data_dir"`
 	Defaults Defaults          `yaml:"defaults"`
 	Icons    map[string]string `yaml:"icons"`
+	IconsDir string            `yaml:"icons_dir"` // project icons (<name>.gif), relative to the config file
 	Colors   Colors            `yaml:"colors"`
 	Sim      Sim               `yaml:"sim"`
 	Sources  Sources           `yaml:"sources"`
@@ -105,6 +106,9 @@ func Load(path string) (*Config, error) {
 		return nil, fmt.Errorf("%s: %w", path, err)
 	}
 	loadDotEnv(filepath.Join(filepath.Dir(path), ".env"))
+	if !filepath.IsAbs(c.IconsDir) {
+		c.IconsDir = filepath.Join(filepath.Dir(path), c.IconsDir)
+	}
 	c.Sources.GitHub.Token = os.Getenv("GITHUB_TOKEN")
 	c.Sources.YouTube.APIKey = os.Getenv("YOUTUBE_API_KEY")
 	c.Sources.Instagram.UserID = os.Getenv("INSTAGRAM_USER_ID")
@@ -122,8 +126,9 @@ func Default() *Config {
 		Defaults: Defaults{Duration: 7, Lifetime: 3600},
 		Colors:   Colors{Text: "#FFFFFF", Up: "#00FF66", Down: "#FF3333", Bar: "#00A2FF"},
 		Sim:      Sim{Addr: "localhost:7070"},
+		IconsDir: "icons",
 		Icons: map[string]string{
-			"github": "21802", "stars": "9459", "youtube": "5952", "instagram": "1644",
+			"github": "21802", "stars": "gh_stars", "youtube": "5952", "instagram": "1644",
 			"linkedin": "32288", "football": "26316", "goal": "8530", "party": "9554",
 		},
 		Sources: Sources{
