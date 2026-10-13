@@ -22,6 +22,16 @@ type Display interface {
 	Notify(ctx context.Context, n awtrix.Notification) error
 }
 
+// RebootWatcher is implemented by awtrix.Client: devices report their uptime,
+// which drops when they restart.
+type RebootWatcher interface {
+	Targets() []string
+	Uptime(ctx context.Context, target string) (secs int64, ok bool, err error)
+}
+
+// RebootCheck is how often devices are asked for their uptime.
+var RebootCheck = 30 * time.Second
+
 type Scheduler struct {
 	cfg     *config.Config
 	display Display
@@ -29,10 +39,13 @@ type Scheduler struct {
 	log     *slog.Logger
 	sources []sources.Source
 	Now     func() time.Time
+
+	mu   sync.Mutex
+	last map[string]*awtrix.App // latest payload of each app, replayed after a device reboot
 }
 
 func New(cfg *config.Config, d Display, st *state.Store, log *slog.Logger, srcs ...sources.Source) *Scheduler {
-	return &Scheduler{cfg: cfg, display: d, store: st, log: log, sources: srcs, Now: time.Now}
+	return &Scheduler{cfg: cfg, display: d, store: st, log: log, sources: srcs, Now: time.Now, last: map[string]*awtrix.App{}}
 }
 
 // Run polls every source until ctx is cancelled.
@@ -41,7 +54,61 @@ func (s *Scheduler) Run(ctx context.Context) {
 	for _, src := range s.sources {
 		wg.Go(func() { s.loop(ctx, src) })
 	}
+	if w, ok := s.display.(RebootWatcher); ok {
+		wg.Go(func() { s.watchReboots(ctx, w) })
+	}
 	wg.Wait()
+}
+
+// watchReboots replays every app when a device's uptime goes backwards: a
+// restarted clock forgets pushed apps, and sources may not tick for an hour.
+func (s *Scheduler) watchReboots(ctx context.Context, w RebootWatcher) {
+	prev := map[string]int64{}
+	t := time.NewTicker(RebootCheck)
+	defer t.Stop()
+	for {
+		for _, target := range w.Targets() {
+			up, ok, err := w.Uptime(ctx, target)
+			if err != nil || !ok {
+				continue // offline or simulator: check again later
+			}
+			if p, seen := prev[target]; seen && up < p {
+				s.log.Info("relógio reiniciou; reenviando apps", "target", target, "uptime", up)
+				s.Replay(ctx)
+			}
+			prev[target] = up
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+		}
+	}
+}
+
+// Replay sends the latest payload of every app again.
+func (s *Scheduler) Replay(ctx context.Context) {
+	s.mu.Lock()
+	apps := make(map[string]*awtrix.App, len(s.last))
+	for name, app := range s.last {
+		apps[name] = app
+	}
+	s.mu.Unlock()
+	for name, app := range apps {
+		s.send(ctx, s.display.Custom(ctx, name, app))
+	}
+}
+
+// custom sends an app and remembers it for Replay (nil removes it).
+func (s *Scheduler) custom(ctx context.Context, name string, app *awtrix.App) {
+	s.mu.Lock()
+	if app == nil {
+		delete(s.last, name)
+	} else {
+		s.last[name] = app
+	}
+	s.mu.Unlock()
+	s.send(ctx, s.display.Custom(ctx, name, app))
 }
 
 // RunOnce fetches every source a single time (used by `preview`).
@@ -79,7 +146,7 @@ func (s *Scheduler) tick(ctx context.Context, src sources.Source) error {
 	s.log.Debug("source fetched", "source", src.Name(), "metrics", len(out.Metrics), "apps", len(out.Apps), "notifications", len(out.Notifications))
 	for _, m := range out.Metrics {
 		app, party := s.counter(m)
-		s.send(ctx, s.display.Custom(ctx, m.Key, app))
+		s.custom(ctx, m.Key, app)
 		if party != nil {
 			s.send(ctx, s.display.Notify(ctx, *party))
 		}
@@ -88,7 +155,7 @@ func (s *Scheduler) tick(ctx context.Context, src sources.Source) error {
 		if app != nil {
 			s.withDefaults(app)
 		}
-		s.send(ctx, s.display.Custom(ctx, name, app))
+		s.custom(ctx, name, app)
 	}
 	for _, n := range out.Notifications {
 		s.send(ctx, s.display.Notify(ctx, n))

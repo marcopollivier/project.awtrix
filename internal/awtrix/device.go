@@ -16,6 +16,8 @@ import (
 	"strings"
 )
 
+// Device-only endpoints (file manager, stats) that the simulator does not have.
+//
 // The clock does not download icons by itself: they must be in its /ICONS
 // folder as GIF or JPG. LaMetric serves PNG for static icons, so those are
 // converted to single-frame GIFs.
@@ -98,3 +100,24 @@ func (c *Client) UploadIcon(ctx context.Context, target, id string, gifData []by
 
 // Targets returns the configured target URLs.
 func (c *Client) Targets() []string { return c.targets }
+
+// Uptime returns the target's uptime in seconds. ok is false when the target
+// does not report one (the simulator).
+func (c *Client) Uptime(ctx context.Context, target string) (secs int64, ok bool, err error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, strings.TrimRight(target, "/")+"/api/stats", nil)
+	if err != nil {
+		return 0, false, err
+	}
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return 0, false, err
+	}
+	defer resp.Body.Close()
+	var st struct {
+		Uptime *int64 `json:"uptime"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&st); err != nil || st.Uptime == nil {
+		return 0, false, err
+	}
+	return *st.Uptime, true, nil
+}

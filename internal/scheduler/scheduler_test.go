@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -77,5 +78,52 @@ func TestCounterDeltaProgressAndMilestone(t *testing.T) {
 	}
 	if len(d.notes) != 1 {
 		t.Fatalf("no new milestone expected: %+v", d.notes)
+	}
+}
+
+type rebootingDisplay struct {
+	fakeDisplay
+	mu      sync.Mutex
+	uptimes []int64
+	calls   int
+}
+
+func (r *rebootingDisplay) Targets() []string { return []string{"clock"} }
+
+func (r *rebootingDisplay) Uptime(context.Context, string) (int64, bool, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	up := r.uptimes[min(r.calls, len(r.uptimes)-1)]
+	r.calls++
+	return up, true, nil
+}
+
+func (r *rebootingDisplay) Custom(ctx context.Context, name string, app *awtrix.App) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.fakeDisplay.Custom(ctx, name, app)
+}
+
+func TestReplaysAppsAfterReboot(t *testing.T) {
+	RebootCheck = 10 * time.Millisecond
+	cfg := config.Default()
+	cfg.Location = time.UTC
+	st, _ := state.Open(filepath.Join(t.TempDir(), "state.json"))
+	d := &rebootingDisplay{fakeDisplay: fakeDisplay{apps: map[string]*awtrix.App{}}, uptimes: []int64{500, 530, 5, 35}}
+	s := New(cfg, d, st, slog.New(slog.DiscardHandler), &fakeSource{value: 10})
+	s.RunOnce(context.Background())
+
+	d.mu.Lock()
+	d.apps = map[string]*awtrix.App{} // the clock forgot everything
+	d.mu.Unlock()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+	s.watchReboots(ctx, d)
+
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.apps["gh"] == nil || d.apps["gh"].Text.String() != "10" {
+		t.Fatalf("app not replayed after reboot: %+v", d.apps)
 	}
 }
