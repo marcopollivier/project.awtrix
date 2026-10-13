@@ -21,7 +21,7 @@ icons_dir: icons
 icons:
   github: "21802"
   stars: "gh_stars"               # ícone próprio: icons/gh_stars.gif
-  youtube: "5952"
+  youtube: "youtube"              # ícone próprio: 1º quadro fixo do 5952
   instagram: "1644"
   linkedin: "32288"
   football: "26316"
@@ -47,7 +47,7 @@ sources:
     handle: omarcodev
     interval: 15m
     latest_video_window: 48h        # mostra views do último vídeo por 48h após publicar
-    milestones: { step: 1000 }
+    milestones: { step: 100 }
 
   instagram:
     enabled: false                  # precisa de INSTAGRAM_USER_ID e INSTAGRAM_TOKEN no .env

@@ -128,7 +128,7 @@ func Default() *Config {
 		Sim:      Sim{Addr: "localhost:7070"},
 		IconsDir: "icons",
 		Icons: map[string]string{
-			"github": "21802", "stars": "gh_stars", "youtube": "5952", "instagram": "1644",
+			"github": "21802", "stars": "gh_stars", "youtube": "youtube", "instagram": "1644",
 			"linkedin": "32288", "football": "26316", "goal": "8530", "party": "9554",
 		},
 		Sources: Sources{
