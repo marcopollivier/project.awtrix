@@ -1,0 +1,29 @@
+{
+  "_doc": "Shared vectors: the Go hub (internal/render, internal/milestones, internal/sources) and the Berry scripts (scripts/counter.ax) must give the same answers. Read by internal/*/parity_test.go and scripts/test/scripts_test.be.",
+  "keys": ["github_followers", "github_stars", "instagram_followers", "linkedin_followers", "youtube_subs"],
+  "count": [
+    [0, "0"], [793, "793"], [4521, "4521"], [9999, "9999"], [10000, "10K"],
+    [12345, "12.3K"], [12978, "13K"], [99949, "99.9K"], [99999, "100K"],
+    [100000, "100K"], [128400, "128K"], [999999, "999K"], [1000000, "1M"],
+    [1234567, "1.2M"], [1260000, "1.3M"], [9999999, "10M"], [12000000, "12M"],
+    [-3, "-3"], [-42, "-42"], [-12345, "-12.3K"]
+  ],
+  "delta": [[0, ""], [7, "+7"], [18, "+18"], [-3, "-3"], [12500, "+12.5K"], [-1234567, "-1.2M"]],
+  "progress": [
+    {"step": 100, "value": 793, "pct": 93},
+    {"step": 100, "value": 800, "pct": 0},
+    {"step": 100, "value": 799, "pct": 99},
+    {"step": 50, "value": 277, "pct": 54},
+    {"step": 500, "value": 4475, "pct": 95},
+    {"step": 0, "value": 793, "pct": null}
+  ],
+  "milestones": [
+    {"step": 100, "readings": [793, 801, 799, 805, 1000, 1250], "party": [0, 800, 0, 0, 1000, 1200]},
+    {"step": 500, "readings": [4475, 4480, 5001], "party": [0, 0, 5000]},
+    {"step": 0, "readings": [793, 900], "party": [0, 0]}
+  ],
+  "known_divergences": {
+    "_doc": "Not tested. Values exactly halfway between tenths round differently: Go formats a float64 with %.1f (binary representation, often down), Berry rounds the integer half up.",
+    "count": [{"value": 11250, "go": "11.2K", "berry": "11.3K"}, {"value": 11950, "go": "11.9K", "berry": "12K"}, {"value": 1250000, "go": "1.2M", "berry": "1.3M"}]
+  }
+}
