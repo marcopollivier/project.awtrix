@@ -267,6 +267,16 @@ O estado do hub (variação do dia, metas, último placar) fica em `~/.awtrix-hu
 | Estrelas não aparecem | falta o `GITHUB_TOKEN` (ou o hub no ar com a fonte `hub`) |
 | Depois de religar, só aparece a hora | os botões da esquerda e da direita foram segurados ao ligar, o que desliga os scripts (modo de recuperação). Religue em *System → Scripting* na interface, ou com `curl -X PUT -H 'Content-Type: application/json' http://<ip>/api/v1/system -d '{"scriptingEnabled":true}'`, e reinicie |
 
+## Qualidade
+
+`make hooks` liga o pre-push versionado em `.githooks/`. Antes de cada push ele:
+
+- procura segredos nos commits que vão subir (gitleaks via `go run`, sem instalar nada) e **bloqueia** se achar;
+- se o push mexe em Go: `gofmt`, `go vet` e `go test` (bloqueiam) e `golangci-lint` (só avisa) se estiver instalado;
+- se mexe em `scripts/`: `make test-scripts`. Sem Berry na máquina, só avisa (use `BERRY=/caminho/para/berry`).
+
+Em emergência, `git push --no-verify` pula o hook. O CI no GitHub roda as mesmas verificações e é quem barra de verdade; as skills do Claude em `.claude/skills/` (paridade, segurança, review) ficam para análise sob demanda.
+
 ## Ideias para depois
 
 Clima e alerta de chuva · dólar/BTC · próxima reunião · CI e PRs · Spotify tocando · Pomodoro pelos botões · modo noturno · espectadores em live · views do vídeo novo do YouTube no script · MQTT/Home Assistant.

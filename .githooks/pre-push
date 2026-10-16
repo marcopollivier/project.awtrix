@@ -1,0 +1,84 @@
+#!/usr/bin/env bash
+# Pre-push checks. Enable with `make hooks`; skip once with `git push --no-verify`.
+#
+# Git feeds one line per ref being pushed on stdin:
+#   <local_ref> <local_sha> <remote_ref> <remote_sha>
+# Only what the push changes is checked: secrets in the outgoing commits always,
+# Go checks when Go files changed, Berry tests when scripts/ changed.
+# The Go and Berry checks run on the working tree, which is normally the commit
+# being pushed.
+set -uo pipefail
+
+GITLEAKS_VERSION=v8.30.1
+ZERO=0000000000000000000000000000000000000000
+
+cd "$(git rev-parse --show-toplevel)" || exit 1
+
+warn() { printf '\033[33mpre-push: %s\033[0m\n' "$*" >&2; }
+fail() { printf '\033[31mpre-push: %s\033[0m\n' "$*" >&2; exit 1; }
+step() { printf 'pre-push: %s\n' "$*" >&2; }
+
+ranges=()   # rev ranges for gitleaks --log-opts
+changed=""  # files touched by the push
+
+while read -r _local_ref local_sha _remote_ref remote_sha; do
+  [ -z "${local_sha:-}" ] && continue
+  [ "$local_sha" = "$ZERO" ] && continue # branch being deleted: nothing to check
+  if [ "$remote_sha" = "$ZERO" ]; then
+    # New branch on the remote: compare against origin/main when it exists.
+    if git rev-parse -q --verify origin/main >/dev/null; then
+      base=$(git merge-base origin/main "$local_sha")
+      ranges+=("origin/main..$local_sha")
+      changed+=$(git diff --name-only "$base" "$local_sha")$'\n'
+    else
+      ranges+=("$local_sha")
+      changed+=$(git ls-tree -r --name-only "$local_sha")$'\n'
+    fi
+  else
+    ranges+=("$remote_sha..$local_sha")
+    changed+=$(git diff --name-only "$remote_sha" "$local_sha")$'\n'
+  fi
+done
+
+[ ${#ranges[@]} -eq 0 ] && exit 0
+
+# 1. Secrets in the outgoing commits. Blocks the push.
+step "procurando segredos (gitleaks $GITLEAKS_VERSION)"
+for r in "${ranges[@]}"; do
+  if ! go run "github.com/zricethezav/gitleaks/v8@$GITLEAKS_VERSION" git \
+      --no-banner --redact --log-level warn --log-opts="$r" .; then
+    fail "gitleaks encontrou possíveis segredos em $r. Tire-os dos commits (git commit --amend / git rebase) antes do push."
+  fi
+done
+
+# 2. Go: format, vet, tests (the deploy↔scripts contract runs in go test).
+if grep -qE '(\.go|^go\.mod|^go\.sum)$' <<<"$changed"; then
+  step "gofmt"
+  unformatted=$(git ls-files -z '*.go' | xargs -0 gofmt -l)
+  [ -n "$unformatted" ] && fail "arquivos sem gofmt:"$'\n'"$unformatted"
+  step "go vet"
+  go vet ./... || fail "go vet falhou"
+  step "go test"
+  go test ./... || fail "go test falhou"
+  # Advisory only: a golangci-lint built with an older Go cannot load this
+  # module's export data and fails for reasons unrelated to the code.
+  if command -v golangci-lint >/dev/null; then
+    step "golangci-lint (só aviso)"
+    golangci-lint run ./... >&2 || warn "golangci-lint apontou problemas (ou está desatualizado para esta versão do Go); o CI verifica."
+  else
+    warn "golangci-lint não encontrado; o CI verifica."
+  fi
+fi
+
+# 3. Berry: the scripts against the NG stand-ins. Missing Berry only warns (CI blocks).
+if grep -q '^scripts/' <<<"$changed"; then
+  berry=${BERRY:-berry}
+  if command -v "$berry" >/dev/null; then
+    step "testes dos scripts Berry"
+    make -s test-scripts BERRY="$berry" || fail "testes dos scripts Berry falharam"
+  else
+    warn "Berry não encontrado (defina BERRY=/caminho/para/berry); testes dos scripts pulados, o CI verifica."
+  fi
+fi
+
+step "ok"
