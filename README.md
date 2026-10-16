@@ -97,7 +97,7 @@ Cada app tem a opção **Fonte**, escolhida no relógio:
 | `direct` | só busca direto |
 | `hub` | só o hub. Útil para as estrelas sem token |
 
-O estado (último valor, variação do dia, metas já comemoradas) fica no relógio, então trocar de fonte não zera nada. Se nenhuma fonte responder, o último valor continua na tela e fica cinza depois de 6h. Para o hub servir os números, defina `api.addr: 0.0.0.0:7080` e `api.public_url: http://<ip-do-mac>:7080` e rode `deploy` de novo.
+O estado (último valor, variação do dia, metas já comemoradas) fica no relógio, então trocar de fonte não zera nada. Se nenhuma fonte responder, o último valor continua na tela e fica cinza depois de 6h. As tentativas vão se espaçando (1, 2, 4, 8… min, até o intervalo do app), e um erro de token ou de limite da API (400/401/403/429) espera o intervalo inteiro. O log do relógio (*Console* na interface, ou `GET /api/v1/logs`) mostra de onde veio cada valor e quando será a próxima tentativa. Para o hub servir os números, defina `api.addr: 0.0.0.0:7080` e `api.public_url: http://<ip-do-mac>:7080` e rode `deploy` de novo.
 
 ### Segurança
 
