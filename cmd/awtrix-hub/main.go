@@ -5,7 +5,8 @@
 //	awtrix-hub run [--sim]             # poll sources and update the targets
 //	awtrix-hub run --mock              # fake data for every source, in the simulator
 //	awtrix-hub preview                 # fetch every source once and exit
-//	awtrix-hub set linkedin 2890       # manual counters
+//	awtrix-hub set linkedin 2890       # manual counters (also updates the clock's script)
+//	awtrix-hub deploy                  # install scripts/*.ax on the clock (runs without the hub)
 package main
 
 import (
@@ -23,11 +24,14 @@ import (
 	"path/filepath"
 	"slices"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
+	"github.com/marcopollivier/project.awtrix/internal/api"
 	"github.com/marcopollivier/project.awtrix/internal/awtrix"
 	"github.com/marcopollivier/project.awtrix/internal/config"
+	"github.com/marcopollivier/project.awtrix/internal/deploy"
 	"github.com/marcopollivier/project.awtrix/internal/mock"
 	"github.com/marcopollivier/project.awtrix/internal/scheduler"
 	"github.com/marcopollivier/project.awtrix/internal/sim"
@@ -48,8 +52,9 @@ comandos:
   sim       inicia o simulador web do relógio
   run       consulta as fontes e atualiza o relógio/simulador
   preview   consulta cada fonte uma vez, envia e sai
-  set       grava um contador manual (ex.: set linkedin 2890)
+  set       grava um contador manual (ex.: set linkedin 2890) e atualiza o relógio
   icons     envia os ícones da config para o relógio (o AWTRIX não baixa sozinho)
+  deploy    instala os scripts no relógio (AWTRIX NG), que passa a funcionar sem o hub
   version   mostra a versão
 `
 
@@ -73,6 +78,8 @@ func main() {
 		err = cmdSet(args)
 	case "icons":
 		err = cmdIcons(ctx, args)
+	case "deploy":
+		err = cmdDeploy(ctx, args)
 	case "version":
 		fmt.Println(version)
 	default:
@@ -214,9 +221,16 @@ func cmdRun(ctx context.Context, args []string, once bool) error {
 	if len(srcs) == 0 {
 		return errors.New("nenhuma fonte habilitada")
 	}
-	client := awtrix.NewClient(cfg.Targets, log.With("component", "awtrix"))
+	client := awtrix.NewClient(cfg.Targets, log.With("component", "awtrix")).WithAuth(cfg.Device.User, cfg.Device.Pass)
 	if err := syncIcons(ctx, cfg, client, log, false); err != nil {
 		log.Warn("ícones não sincronizados", "err", err)
+	}
+	if cfg.API.Addr != "" && !once {
+		go func() {
+			if err := serveAPI(ctx, cfg.API.Addr, st, log); err != nil && !errors.Is(err, context.Canceled) {
+				log.Error("endpoint de métricas", "err", err)
+			}
+		}()
 	}
 	sched := scheduler.New(cfg, client, st, log, srcs...)
 	log.Info("enviando para", "targets", cfg.Targets)
@@ -225,6 +239,21 @@ func cmdRun(ctx context.Context, args []string, once bool) error {
 		return nil
 	}
 	sched.Run(ctx)
+	return ctx.Err()
+}
+
+// serveAPI serves the metrics endpoint the clock's scripts read until ctx ends.
+func serveAPI(ctx context.Context, addr string, st *state.Store, log *slog.Logger) error {
+	ln, err := net.Listen("tcp", addr)
+	if err != nil {
+		return err
+	}
+	srv := &http.Server{Handler: api.Handler(st, time.Now), ReadHeaderTimeout: 5 * time.Second}
+	context.AfterFunc(ctx, func() { srv.Close() })
+	log.Info("endpoint de métricas no ar", "url", "http://"+ln.Addr().String()+"/api/v1/metrics")
+	if err := srv.Serve(ln); !errors.Is(err, http.ErrServerClosed) {
+		return err
+	}
 	return ctx.Err()
 }
 
@@ -338,7 +367,63 @@ func cmdSet(args []string) error {
 	if err := state.SetManual(manualPath(cfg), fl.Arg(0), v, time.Now()); err != nil {
 		return err
 	}
-	fmt.Printf("%s = %d (aparece no relógio em até 1 minuto se o run estiver rodando)\n", fl.Arg(0), v)
+	fmt.Printf("%s = %d (o run, se estiver rodando, envia em até 1 minuto)\n", fl.Arg(0), v)
+	if cfg.Device.URL == "" {
+		return nil
+	}
+	// The clock's linkedin script reads its value from @config.
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	client := awtrix.NewClient(nil, newLogger(false)).WithAuth(cfg.Device.User, cfg.Device.Pass)
+	if err := client.PatchAppConfig(ctx, cfg.Device.URL, "linkedin", map[string]any{"followers": v}); err != nil {
+		return fmt.Errorf("relógio (%s) não atualizado: %w", cfg.Device.URL, err)
+	}
+	fmt.Println("relógio atualizado:", cfg.Device.URL)
+	return nil
+}
+
+func cmdDeploy(ctx context.Context, args []string) error {
+	fl := flag.NewFlagSet("deploy", flag.ExitOnError)
+	cfgPath := fl.String("config", "config.yaml", "arquivo de configuração")
+	target := fl.String("target", "", "relógio (padrão: device.url da config)")
+	only := fl.String("only", "", "instala só estes scripts, separados por vírgula (ex.: counter,github)")
+	noIcons := fl.Bool("no-icons", false, "não envia os ícones")
+	fl.Parse(args)
+	log := newLogger(false)
+	cfg, err := loadConfig(*cfgPath, log)
+	if err != nil {
+		return err
+	}
+	if *target == "" {
+		*target = cfg.Device.URL
+	}
+	if *target == "" {
+		return errors.New("defina device.url na config ou use --target http://<ip-do-relógio>")
+	}
+	scripts, err := deploy.Load(cfg.Scripts)
+	if err != nil {
+		return err
+	}
+	client := awtrix.NewClient([]string{*target}, log).WithAuth(cfg.Device.User, cfg.Device.Pass)
+	if !*noIcons {
+		if err := syncIcons(ctx, cfg, client, log, false); err != nil {
+			log.Warn("ícones não sincronizados", "err", err)
+		}
+	}
+	var followers *int64
+	if m, err := state.ReadManual(manualPath(cfg)); err == nil {
+		if v, ok := m[linkedin.Key]; ok {
+			followers = &v.Value
+		}
+	}
+	var names []string
+	if *only != "" {
+		names = strings.Split(*only, ",")
+	}
+	if err := deploy.Deploy(ctx, client, *target, scripts, deploy.Settings(cfg, followers), names, log); err != nil {
+		return err
+	}
+	fmt.Println("pronto: o relógio busca os dados sozinho; o hub é opcional")
 	return nil
 }
 

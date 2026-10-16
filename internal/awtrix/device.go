@@ -122,15 +122,18 @@ func (c *Client) PatchAppConfig(ctx context.Context, target, name string, values
 
 // AppInfo is one entry of GET /api/v1/apps.
 type AppInfo struct {
-	Name    string `json:"name"`
-	Origin  string `json:"origin"` // builtin | pushed | script
-	Enabled bool   `json:"enabled"`
-	InLoop  bool   `json:"inLoop"`
-	Error   *struct {
-		Message string `json:"message"`
-		Line    int    `json:"line"`
-		Hook    string `json:"hook"`
-	} `json:"error"`
+	Name    string    `json:"name"`
+	Origin  string    `json:"origin"` // builtin | pushed | script
+	Enabled bool      `json:"enabled"`
+	InLoop  bool      `json:"inLoop"`
+	Error   *AppError `json:"error"`
+}
+
+// AppError is a script's compile or runtime error.
+type AppError struct {
+	Message string `json:"message"`
+	Line    int    `json:"line"`
+	Hook    string `json:"hook"` // compile, setup, loop, draw...
 }
 
 // Apps lists every app on the clock, with script compile/runtime errors.
