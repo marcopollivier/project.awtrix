@@ -26,7 +26,7 @@ class GitHub : Base
     end
     http.get("https://api.github.com/users/" + self.st.get("user"), def (b, s)
       var mm = (b != nil && s == 200) ? re.search("\"followers\": *(\\d+)", b) : nil
-      done(mm != nil ? int(mm[1]) : nil)
+      done(mm != nil ? int(mm[1]) : nil, s)
     end, {"headers": h, "find": "\"followers\":", "keep": 32})
   end
 end

@@ -63,7 +63,7 @@ class Instagram : Base
         end
       end
       var mm = (b != nil && s == 200) ? re.search("\"followers_count\": *(\\d+)", b) : nil
-      done(mm != nil ? int(mm[1]) : nil)
+      done(mm != nil ? int(mm[1]) : nil, s)
     end, {"find": "\"followers_count\"", "keep": 48})
   end
 end

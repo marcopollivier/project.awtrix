@@ -30,7 +30,7 @@ class GitHubStars : Base
             "\\\"){repositories(ownerAffiliations:OWNER,isFork:false,privacy:PUBLIC,first:100){nodes{stargazerCount}}}}\"}"
     http.post("https://api.github.com/graphql", q, def (b, s)
       if b == nil || s != 200
-        done(nil)
+        done(nil, s)
         return
       end
       var total = 0

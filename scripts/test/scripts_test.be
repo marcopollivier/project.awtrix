@@ -57,6 +57,24 @@ tick(gh)
 http.answer(nil, 0)
 check("network failure keeps the value", texts(gh), "799 +5")
 check("retry soon", gh.ticks, 60)
+var waits = []
+for i : 1 .. 5
+  tick(gh)
+  http.answer(nil, 0)
+  waits.push(gh.ticks / 60)
+end
+check("backoff doubles up to the interval", waits, [2, 4, 8, 16, 30])
+tick(gh)
+http.answer('{"followers": 799}', 200)
+check("success resets the backoff", gh.fails, 0)
+tick(gh)
+http.answer(nil, 0)
+check("first failure after a success", gh.ticks, 60)
+tick(gh)
+http.answer('{"message":"API rate limit exceeded"}', 403)
+check("rate limit waits the whole interval", gh.ticks, 1800)
+tick(gh)
+http.answer('{"followers": 799}', 200)
 
 T["epoch"] += 7 * 3600
 gh.render()
@@ -138,6 +156,7 @@ check("alert text", notes[0]["text"], "TOKEN INSTAGRAM INVALIDO")
 tick(ig)
 http.answer('{"error":{}}', 401)
 check("alert at most once a day", size(notes), 1)
+check("invalid token waits the whole interval", ig.ticks, 1800)
 
 # --- LinkedIn: from the settings, gray after stale_days without change ---
 var li = load("scripts/linkedin.ax", {"followers": 7500, "icon": "32288", "step": 500, "stale_days": 30})

@@ -20,6 +20,9 @@
 #   - the daily delta, the milestones and the last value live in the app's own
 #     store, so switching sources keeps them, and they survive a reboot.
 #   - with no answer at all, the last value stays on screen, gray when old.
+#     Retries back off: 1, 2, 4, 8... min up to the app's interval. An answer
+#     that waiting will not fix (400/401/403/429: bad token, rate limit) waits
+#     the whole interval.
 #
 # The app passes its own store in: settings and state are per app, and this
 # module never guesses whose store a call belongs to.
@@ -39,6 +42,7 @@ class Counter
   var st, cfg, key, label, icon, src, step
   var parts, pct            # what draw() paints, built after each update
   var ticks, period, busy   # loop() countdown, seconds between fetches, request in flight
+  var fails                 # failed fetches in a row, for the backoff
   var hub_down              # now_ms() until which the hub is skipped
   var stale_s               # gray after this many seconds without news
   var on_change             # "news" means the value changed (manual counters)
@@ -54,6 +58,7 @@ class Counter
     self.period = int(st.get("interval_min", 30)) * 60
     self.ticks = 0
     self.busy = false
+    self.fails = 0
     self.hub_down = 0
     self.stale_s = 6 * 3600
     self.on_change = false
@@ -77,7 +82,7 @@ class Counter
     if ask_hub
       http.get(hub + "/api/v1/metrics/" + self.key, / b, s -> self.from_hub(b, s))
     elif self.src != "hub"
-      self.direct(/ v -> self.got(v, "direct"))
+      self.direct(/ v, s -> self.got(v, "direct", s))
     else
       self.got(nil, "hub")
     end
@@ -98,24 +103,33 @@ class Counter
       self.got(nil, "hub")
     else
       self.hub_down = now_ms() + 30 * 60 * 1000
-      self.direct(/ x -> self.got(x, "direct"))
+      self.direct(/ x, s -> self.got(x, "direct", s))
     end
   end
 
-  # Subclasses override: fetch the number and call done(value), or done(nil).
+  # Subclasses override: fetch the number and call done(value), or
+  # done(nil, status) with the HTTP status when there is one.
   def direct(done)
     done(nil)
   end
 
-  # got updates the stored state with a new reading (nil = nothing arrived).
-  def got(v, how)
+  # got updates the stored state with a new reading (nil = nothing arrived;
+  # status is the HTTP status of a direct fetch, nil/0 without one).
+  def got(v, how, status)
     self.busy = false
     if v == nil
-      log(self.key + ": sem resposta (" + how + ")")
-      if self.ticks > 60 self.ticks = 60 end   # try again soon, e.g. Wi-Fi just came back
+      self.fails += 1
+      var wait = self.period
+      if status != 400 && status != 401 && status != 403 && status != 429
+        wait = 60 << (self.fails < 12 ? self.fails - 1 : 11)   # 1, 2, 4... min
+        if wait > self.period wait = self.period end
+      end
+      self.ticks = wait
+      log(self.key + ": sem resposta (" + how + ", " + str(status) + "), nova tentativa em " + str(wait / 60) + " min")
       self.render()
       return
     end
+    self.fails = 0
     log(self.key + ": " + str(v) + " (" + how + ")")
     var s = self.st.get("state")
     var now = self.now()
