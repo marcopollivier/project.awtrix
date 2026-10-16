@@ -1,0 +1,35 @@
+# Secret scanning for this repository (gitleaks v8). The repository is public:
+# anything committed here is published. The default rules already cover GitHub
+# tokens (ghp_, github_pat_) and Google API keys (AIza...); the rules below add
+# the project's own secrets.
+#   make secrets          # working tree + full history
+
+title = "project.awtrix"
+
+[extend]
+useDefault = true
+
+# Instagram Login tokens (IGAA..., IGQV...): INSTAGRAM_TOKEN in .env.
+[[rules]]
+id = "instagram-access-token"
+description = "Instagram access token"
+regex = '''\b(IG(?:AA|QV)[A-Za-z0-9_-]{40,})'''
+keywords = ["igaa", "igqv"]
+
+# Meta Graph user/page tokens (EAA...), in case the Facebook login flow is used.
+[[rules]]
+id = "meta-access-token"
+description = "Meta Graph access token"
+regex = '''\b(EAA[A-Za-z0-9]{60,})'''
+keywords = ["eaa"]
+
+# A project secret assigned in a .env-style file (.env.example keeps them empty).
+[[rules]]
+id = "awtrix-env-secret"
+description = "Project secret assigned in a .env-style file"
+regex = '''(?m)^[ \t]*(?:export[ \t]+)?(?:YOUTUBE_API_KEY|GITHUB_TOKEN|INSTAGRAM_TOKEN|AWTRIX_PASS)[ \t]*=[ \t]*["']?([^\s"'#]+)'''
+keywords = ["youtube_api_key", "github_token", "instagram_token", "awtrix_pass"]
+
+[allowlist]
+description = "Templates that keep the values empty"
+paths = ['''(^|/)\.env\.example$''', '''(^|/)config\.example\.yaml$''']

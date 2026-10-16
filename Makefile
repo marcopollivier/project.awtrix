@@ -50,3 +50,12 @@ mock:
 # replay de um jogo do Vasco (gols, intervalo, fim) no simulador
 replay:
 	go run ./cmd/awtrix-hub run --sim --only football --football-fixture $(FIXTURE)
+
+# Segredos no histórico inteiro e nas mudanças ainda não commitadas (regras em
+# .gitleaks.toml). Arquivos ignorados, como o .env, ficam de fora. O gitleaks
+# roda via go run, sem instalar nada.
+GITLEAKS ?= go run github.com/zricethezav/gitleaks/v8@v8.30.1
+.PHONY: secrets
+secrets:
+	$(GITLEAKS) git --redact --no-banner --log-opts=--all .
+	$(GITLEAKS) git --redact --no-banner --pre-commit .
