@@ -26,4 +26,15 @@ func TestMetrics(t *testing.T) {
 	if ct := rec.Header().Get("Content-Type"); ct != "application/json" {
 		t.Fatalf("content type %q", ct)
 	}
+
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest("GET", "/api/v1/metrics/github_followers", nil))
+	if want := `{"age":60,"value":794}` + "\n"; rec.Code != 200 || rec.Body.String() != want {
+		t.Fatalf("one metric: %d %s", rec.Code, rec.Body)
+	}
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest("GET", "/api/v1/metrics/nope", nil))
+	if rec.Code != 404 {
+		t.Fatalf("unknown metric: %d", rec.Code)
+	}
 }

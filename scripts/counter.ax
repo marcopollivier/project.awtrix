@@ -1,0 +1,223 @@
+# @name    Counter
+# @desc    Base dos contadores: formatação, metas, variação do dia, hub com fallback
+# @author  marcopollivier
+# @version 1.0
+# @module
+# @config  hub_url    text  "Hub (opcional)"       default="" help="ex.: http://192.168.0.10:7080. Vazio: os apps buscam direto"
+# @config  text_color color "Cor do número"        default=#FFFFFF
+# @config  up_color   color "Cor da alta do dia"   default=#00FF66
+# @config  down_color color "Cor da queda do dia"  default=#FF3333
+# @config  bar_color  color "Cor da barra de meta" default=#00A2FF
+# @config  party_icon text  "Ícone da comemoração" default="9554"
+
+# Each app script is a subclass of counter.Counter that only knows how to fetch
+# its number straight from the service (direct). This base does the rest, like
+# the hub's scheduler.counter in Go:
+#
+#   - source "auto" (default): ask the hub when hub_url is set; if it does not
+#     answer, mark it down for 30 min and fetch direct in the same cycle.
+#     "direct" never asks the hub, "hub" never fetches direct.
+#   - the daily delta, the milestones and the last value live in the app's own
+#     store, so switching sources keeps them, and they survive a reboot.
+#   - with no answer at all, the last value stays on screen, gray when old.
+#
+# The app passes its own store in: settings and state are per app, and this
+# module never guesses whose store a call belongs to.
+
+var m = module("counter")
+
+m.cfg = {
+  "hub":   store.get("hub_url"),
+  "text":  store.get("text_color"),
+  "up":    store.get("up_color"),
+  "down":  store.get("down_color"),
+  "bar":   store.get("bar_color"),
+  "party": store.get("party_icon")
+}
+
+class Counter
+  var st, cfg, key, label, icon, src, step
+  var parts, pct            # what draw() paints, built after each update
+  var ticks, period, busy   # loop() countdown, seconds between fetches, request in flight
+  var hub_down              # now_ms() until which the hub is skipped
+  var stale_s               # gray after this many seconds without news
+  var on_change             # "news" means the value changed (manual counters)
+
+  def init(st, cfg, key, label)
+    self.st = st
+    self.cfg = cfg
+    self.key = key
+    self.label = label
+    self.icon = st.get("icon")
+    self.src = st.get("source", "auto")
+    self.step = int(st.get("step", 0))
+    self.period = int(st.get("interval_min", 30)) * 60
+    self.ticks = 0
+    self.busy = false
+    self.hub_down = 0
+    self.stale_s = 6 * 3600
+    self.on_change = false
+    self.pct = -1
+    self.render()
+  end
+
+  # --- fetching ---
+
+  def loop()
+    if self.ticks > 0
+      self.ticks -= 1
+      return
+    end
+    self.ticks = self.period
+    if self.busy return end
+    self.busy = true
+    var hub = self.cfg["hub"]
+    var ask_hub = self.src != "direct" && hub != nil && hub != "" &&
+                  (self.src == "hub" || now_ms() >= self.hub_down)
+    if ask_hub
+      http.get(hub + "/api/v1/metrics/" + self.key, / b, s -> self.from_hub(b, s))
+    elif self.src != "hub"
+      self.direct(/ v -> self.got(v, "direct"))
+    else
+      self.got(nil, "hub")
+    end
+  end
+
+  def from_hub(body, status)
+    var v = nil
+    if body != nil && status == 200
+      var mv = re.search("\"value\":(\\d+)", body)
+      var ma = re.search("\"age\":(\\d+)", body)
+      if mv != nil && ma != nil && int(ma[1]) < self.stale_s
+        v = int(mv[1])
+      end
+    end
+    if v != nil
+      self.got(v, "hub")
+    elif self.src == "hub"
+      self.got(nil, "hub")
+    else
+      self.hub_down = now_ms() + 30 * 60 * 1000
+      self.direct(/ x -> self.got(x, "direct"))
+    end
+  end
+
+  # Subclasses override: fetch the number and call done(value), or done(nil).
+  def direct(done)
+    done(nil)
+  end
+
+  # got updates the stored state with a new reading (nil = nothing arrived).
+  def got(v, how)
+    self.busy = false
+    if v == nil
+      log(self.key + ": sem resposta (" + how + ")")
+      if self.ticks > 60 self.ticks = 60 end   # try again soon, e.g. Wi-Fi just came back
+      self.render()
+      return
+    end
+    log(self.key + ": " + str(v) + " (" + how + ")")
+    var s = self.st.get("state")
+    var now = self.now()
+    var today = self.today()
+    if s == nil
+      s = {"v": v, "at": now, "d": today, "s": v, "c": -1}
+    end
+    if today > 0 && s["d"] != today
+      s["d"] = today
+      s["s"] = s["v"]            # the last value seen before midnight
+    end
+    if !self.on_change || s["v"] != v || s["at"] <= 0
+      s["at"] = now
+    end
+    s["v"] = v
+    var party = 0
+    if self.step > 0
+      var reached = v / self.step * self.step
+      if s["c"] < 0
+        s["c"] = reached         # first reading: baseline, no party
+      elif reached > s["c"]
+        s["c"] = reached
+        party = reached
+      end
+    end
+    self.st.set("state", s)
+    self.render()
+    if party > 0
+      notify({"text": self.label + " " + self.count(party) + "!", "icon": self.cfg["party"],
+              "textColor": "palette", "palette": "Rainbow", "repeat": 3,
+              "sound": {"rtttl": "party:d=16,o=5,b=180:c,e,g,c6,8p,g,2c6"}})
+    end
+  end
+
+  # --- presentation ---
+
+  # render builds the text pieces and the bar once, so draw() builds nothing.
+  def render()
+    var s = self.st.get("state")
+    if s == nil
+      self.parts = nil
+      return
+    end
+    var v = s["v"]
+    var now = self.now()
+    var old = now > 0 && s["at"] > 0 && now - s["at"] > self.stale_s
+    self.parts = [[self.count(v), old ? 0x666666 : self.cfg["text"]]]
+    var d = v - s["s"]
+    if d > 0
+      self.parts.push([" +" + self.count(d), self.cfg["up"]])
+    elif d < 0
+      self.parts.push([" " + self.count(d), self.cfg["down"]])
+    end
+    self.pct = -1
+    if self.step > 0
+      self.pct = (v - v / self.step * self.step) * 100 / self.step
+    end
+  end
+
+  def should_show()
+    return self.parts != nil   # nothing yet: skip the turn instead of a blank screen
+  end
+
+  def draw()
+    clear()
+    icon(self.icon, 0, 0)
+    scroll_text(9, 6, width() - 9, self.parts, self.cfg["text"])
+    if self.pct >= 0
+      progress(self.pct, self.cfg["bar"], 0x202020, 9)
+    end
+  end
+
+  # count formats like render.Count in Go: 793, 4521, 12.3K, 128K, 1.2M.
+  def count(v)
+    if v < 0 return "-" + self.count(-v) end
+    if v < 10000 return str(v) end
+    if v < 100000 return self.tenths(v, 1000) + "K" end
+    if v < 1000000 return str(v / 1000) + "K" end
+    if v < 10000000 return self.tenths(v, 1000000) + "M" end
+    return str(v / 1000000) + "M"
+  end
+
+  # tenths is v/unit rounded to one decimal, without a trailing ".0".
+  def tenths(v, unit)
+    var t = (v * 10 + unit / 2) / unit
+    var s = str(t / 10)
+    if t % 10 != 0
+      s += "." + str(t % 10)
+    end
+    return s
+  end
+
+  # today is the local date as 20261016, or -1 before the clock knows the time.
+  def today()
+    if year() < 0 return -1 end
+    return year() * 10000 + month() * 100 + day()
+  end
+
+  def now()
+    return epoch_ms() / 1000   # 0 until the time is known (epoch_ms() answers -1)
+  end
+end
+
+m.Counter = Counter
+return m

@@ -1,0 +1,47 @@
+# @name     GitHub Stars
+# @desc     Soma das estrelas dos repositórios próprios (sem forks)
+# @author   marcopollivier
+# @version  1.0
+# @requires counter
+# @config   user         text   "Usuário"          default="marcopollivier"
+# @config   token        text   "Token"            default="" maxlen=256 help="Necessário para buscar direto (GraphQL). Sem token, só pelo hub"
+# @config   icon         text   "Ícone"            default="gh_stars"
+# @config   step         number "Meta a cada"      default=50 min=0 max=1000000 help="0 desliga a barra e a comemoração"
+# @config   interval_min number "Atualizar a cada" default=30 min=1 max=1440 unit=min
+# @config   source       select "Fonte"            options=auto,direct,hub default=auto help="auto: hub se estiver no ar, senão direto"
+import counter
+var Base = counter.Counter
+
+class GitHubStars : Base
+  def init()
+    super(self).init(store, counter.cfg, "github_stars", "STARS")
+  end
+
+  # The REST list of repositories is ~350 KB, far over the clock's 8 KB. GraphQL
+  # answers only the counts (~1 KB for 60 repos), but it needs a token.
+  # Up to 100 public, non-fork repositories, like the hub.
+  def direct(done)
+    var tok = self.st.get("token")
+    if tok == nil || tok == ""
+      done(nil)
+      return
+    end
+    var q = "{\"query\":\"{user(login:\\\"" + self.st.get("user") +
+            "\\\"){repositories(ownerAffiliations:OWNER,isFork:false,privacy:PUBLIC,first:100){nodes{stargazerCount}}}}\"}"
+    http.post("https://api.github.com/graphql", q, def (b, s)
+      if b == nil || s != 200
+        done(nil)
+        return
+      end
+      var total = 0
+      for n : re.matchall("\\d+", b)   # the window holds only the counts
+        total += int(n)
+      end
+      done(total)
+    end, {"headers": {"User-Agent": "awtrix-ng", "Authorization": "Bearer " + tok,
+                      "Content-Type": "application/json"},
+          "find": "\"nodes\":[", "keep": 4096})
+  end
+end
+
+return GitHubStars()
