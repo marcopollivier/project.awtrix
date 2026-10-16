@@ -59,3 +59,8 @@ GITLEAKS ?= go run github.com/zricethezav/gitleaks/v8@v8.30.1
 secrets:
 	$(GITLEAKS) git --redact --no-banner --log-opts=--all .
 	$(GITLEAKS) git --redact --no-banner --pre-commit .
+
+# liga os hooks versionados em .githooks (pre-push: segredos, Go, Berry)
+.PHONY: hooks
+hooks:
+	git config core.hooksPath .githooks

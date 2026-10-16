@@ -23,12 +23,15 @@ make lint-scripts BERRY=/path/to/berry   # compile every .ax, @config only in th
 make dev                   # hub + simulator at http://localhost:7070
 make mock                  # fake data for every source, simulator only, throwaway state
 make replay                # recorded Vasco match in the simulator
+make hooks                 # enable .githooks/pre-push (gitleaks, Go checks, Berry tests)
 
 ./bin/awtrix-hub deploy [--only counter,github] [--no-icons]   # install scripts on the clock
 ./bin/awtrix-hub set linkedin 7430                             # manual counter, also PATCHes the clock
 ```
 
 Berry is not in Homebrew. Build it with `git clone https://github.com/berry-lang/berry && make -C berry`.
+
+The pre-push hook scans the outgoing commits with gitleaks (blocks), runs gofmt/vet/test when Go changed (blocks), and runs the Berry tests when `scripts/` changed (only warns if Berry is missing; CI blocks). Do not bypass it with `--no-verify` unless the user asks.
 
 Config is `config.yaml` (from `config.example.yaml`) and secrets are in `.env`. Both are gitignored. Hub state lives in `~/.awtrix-hub/`.
 
