@@ -1,16 +1,22 @@
 # project.awtrix
 
-Alimenta um **Ulanzi TC001** (matriz de LEDs 32×8) rodando **[AWTRIX 3](https://blueforcer.github.io/awtrix3/)** com:
+Alimenta um **Ulanzi TC001** (matriz de LEDs 32×8) rodando **[AWTRIX NG](https://blueforcer.github.io/awtrix-ng/)** com:
 
 - contadores de **YouTube**, **GitHub**, **Instagram** e **LinkedIn**, com variação do dia, barra até a próxima meta e comemoração quando bate a meta;
-- o **Vasco ao vivo**: próximo jogo, placar em tempo real, notificação (com som) de gol, intervalo e fim;
+- o **Vasco ao vivo** (só pelo hub): próximo jogo, placar em tempo real, notificação (com som) de gol, intervalo e fim;
 - um **simulador no navegador**, que fala a mesma API do relógio, para ver tudo antes de mandar para o aparelho.
 
+Tem duas partes, e só a primeira é obrigatória:
+
 ```
-sources (GitHub, YouTube, Instagram, LinkedIn, ESPN)
-   └─► scheduler (variação do dia, metas, renderização)
-          └─► awtrix.Client ──► simulador (localhost:7070) e/ou relógio (IP na rede)
+relógio (AWTRIX NG)                         hub (Go, opcional, no Mac)
+  scripts/*.ax ── busca direto ──► APIs       sources ─► scheduler ─► simulador / apps empurrados
+       │                                         │
+       └──── se o hub estiver no ar ────► GET /api/v1/metrics/{key}
 ```
+
+- **Relógio independente**: os scripts em `scripts/` rodam dentro do relógio, buscam os dados sozinhos e guardam a variação do dia e as metas no próprio aparelho. Não precisa de nada ligado em casa.
+- **Hub** (`awtrix-hub`): instala e configura os scripts (`deploy`), roda o simulador e, quando está no ar, serve os números para os scripts. Se ele cair, os scripts voltam a buscar direto.
 
 ## Começando
 
@@ -19,6 +25,8 @@ cp config.example.yaml config.yaml
 cp .env.example .env          # preencha as chaves que tiver
 make dev                      # hub + simulador → http://localhost:7070
 ```
+
+Para o relógio funcionar sozinho: instale o AWTRIX NG (veja [Instalando o AWTRIX NG](#instalando-o-awtrix-ng-no-relógio)), coloque o IP em `device.url` e rode `make build && ./bin/awtrix-hub deploy`.
 
 | Comando | O que faz |
 |---|---|
@@ -33,6 +41,7 @@ make dev                      # hub + simulador → http://localhost:7070
 | `awtrix-hub deploy` | instala `scripts/*.ax` no relógio (AWTRIX NG) e preenche as configurações a partir da config e do `.env` |
 | `awtrix-hub run --only github --debug` | roda só uma fonte, com logs detalhados |
 | `make test` | testes |
+| `make test-scripts` | testa `scripts/*.ax` num interpretador [Berry](https://github.com/berry-lang/berry) com imitações do runtime do NG (`BERRY=/caminho/para/berry`) |
 
 Estado (variação do dia, metas já comemoradas, último placar) fica em `~/.awtrix-hub/`.
 
@@ -55,7 +64,46 @@ curl -X POST -H 'Content-Type: application/json' localhost:7070/api/v1/notificat
 curl -X DELETE localhost:7070/api/v1/apps/teste
 ```
 
-A fonte e o tempo de rolagem são aproximações do relógio. Ajuste comparando lado a lado quando o aparelho estiver com AWTRIX 3 (coloque os dois em `targets`).
+A fonte e o tempo de rolagem são aproximações do relógio. Para ajustar, compare lado a lado com o relógio: empurre o mesmo app para os dois (coloque os dois em `targets`).
+
+## Relógio independente (scripts)
+
+Cada contador é um script [Berry](https://berry-lang.github.io/) que o relógio roda sozinho:
+
+| Script | De onde vem | Precisa de |
+|---|---|---|
+| `counter.ax` | módulo com a base de todos: formatação, variação do dia, metas, fallback | — |
+| `github.ax` | `api.github.com/users/{user}` | nada (token opcional) |
+| `github_stars.ax` | GraphQL do GitHub | **token** só leitura (a lista REST de repositórios tem ~350 KB, e o relógio aceita respostas de até 8 KB). Sem token, só pelo hub |
+| `youtube.ax` | YouTube Data API v3 | chave da API |
+| `instagram.ax` | `graph.instagram.com` | token (renovado toda semana pelo próprio script) |
+| `linkedin.ax` | valor digitado | `awtrix-hub set linkedin N` ou a interface do relógio |
+
+`awtrix-hub deploy`:
+1. envia os ícones;
+2. instala os scripts;
+3. preenche as configurações de cada um a partir de `config.yaml` e `.env` (usuário, chaves, metas, cores, endereço do hub);
+4. mostra o erro de cada script, com a linha, se houver.
+
+Rodar de novo é seguro: tokens vazios no `.env` não apagam o que foi digitado no relógio. Depois do deploy, tudo pode ser ajustado em *Apps → ⚙* na interface do relógio.
+
+### Fallback entre hub e busca direta
+
+Cada app tem a opção **Fonte**, escolhida no relógio:
+
+| Fonte | Comportamento |
+|---|---|
+| `auto` (padrão) | Com o **Hub** preenchido no módulo `counter`, pergunta ao hub. Se ele não responde ou o valor tem mais de 6h, marca o hub como fora por 30 min e busca direto **no mesmo ciclo**. Sem hub configurado, sempre direto |
+| `direct` | só busca direto |
+| `hub` | só o hub. Útil para as estrelas sem token |
+
+O estado (último valor, variação do dia, metas já comemoradas) fica no relógio, então trocar de fonte não zera nada. Se nenhuma fonte responder, o último valor continua na tela e fica cinza depois de 6h. Para o hub servir os números, defina `api.addr: 0.0.0.0:7080` e `api.public_url: http://<ip-do-mac>:7080` e rode `deploy` de novo.
+
+### Segurança
+
+O AWTRIX NG não confere o certificado HTTPS, e os scripts (com os tokens) podem ser lidos pela API do relógio. Por isso:
+- use **tokens só de leitura**: GitHub fine-grained sem permissões além de público, chave do YouTube restrita à Data API;
+- ligue a **senha da interface** (`authEnabled`) e coloque `AWTRIX_USER`/`AWTRIX_PASS` no `.env`.
 
 ## Fontes
 
@@ -102,19 +150,29 @@ O token vale 60 dias. O hub renova o token toda semana e guarda o novo em `~/.aw
 
 O último placar fica salvo, então reiniciar o hub no meio do jogo não repete notificação de gol.
 
-## Instalando o AWTRIX 3 no relógio
+## Instalando o AWTRIX NG no relógio
 
-> Substitui o firmware da Ulanzi (e a tela de configuração dela). A opção "Awtrix Simulator" do firmware de fábrica é para o AWTRIX 2, que está descontinuado, e não é usada aqui.
+> Substitui o firmware atual (da Ulanzi ou o AWTRIX 3) e apaga as configurações dele. O backup do firmware de fábrica da Ulanzi fica em `~/.awtrix-hub/backup/`.
+
+O cabo só é necessário nesta instalação. Depois, scripts, configurações e atualizações do NG vão pelo Wi-Fi.
 
 1. Use um cabo USB-C **de dados** (cabo só de carga não funciona) e ligue o relógio direto no Mac.
-2. No **Chrome ou Edge** (o Safari não tem Web Serial), abra o [flasher](https://blueforcer.github.io/awtrix3/#/flasher) → *Connect/Install* → escolha a porta `usbserial`/`wchusbserial`.
-3. Depois de reiniciar, conecte-se à rede Wi-Fi `awtrix_xxxx` (senha `12345678`), configure o Wi-Fi de casa e anote o IP.
-4. Se a porta não aparecer, rode `ls /dev/cu.*`. Quase sempre o problema é o cabo.
-5. Na interface web do relógio, desligue os apps nativos que não quiser e ajuste o brilho.
-6. Coloque `http://<ip>` em `targets` no `config.yaml`.
-7. Rode `awtrix-hub icons`. Além dos IDs da LaMetric, a config aceita ícones próprios: um GIF 8×8 em `icons/` (ex.: `icons/gh_stars.gif`, o Octocat com estrela) referenciado pelo nome (`stars: "gh_stars"`). O AWTRIX não baixa ícones sozinho: eles precisam estar na pasta `/ICONS` do relógio, em GIF ou JPG. O comando baixa os ícones da LaMetric, converte de PNG para GIF quando precisa e envia. O `run` faz o mesmo ao iniciar.
+2. No **Chrome ou Edge** (o Safari não tem Web Serial), abra o [flasher do AWTRIX NG](https://blueforcer.github.io/awtrix-ng/esp32/getting-started/flashing/), escolha **Fresh install** e a porta `usbserial`/`wchusbserial`. Espere aparecer *Done*.
+3. O relógio abre a rede Wi-Fi de configuração dele. Conecte-se, configure o Wi-Fi de casa e anote o IP, que aparece no display a cada inicialização.
+4. Na interface web (`http://<ip>`):
+   - fuso `<-03>3` e NTP `br.pool.ntp.org`;
+   - deixe só o app de hora entre os nativos;
+   - ajuste o brilho;
+   - ligue a senha da interface.
+5. Na `config.yaml`: `device.url: http://<ip>`. No `.env`: `AWTRIX_USER`/`AWTRIX_PASS`.
+6. `make build && ./bin/awtrix-hub deploy`.
+7. Se a porta não aparecer no passo 2, rode `ls /dev/cu.*`. Quase sempre o problema é o cabo.
 
-## Rodando sempre (launchd)
+Ícones: além dos IDs da LaMetric, a config aceita ícones próprios, um GIF 8×8 em `icons/` referenciado pelo nome (ex.: `stars: "gh_stars"`). O relógio não baixa ícones sozinho. O `deploy`, o `icons` e o `run` baixam os da LaMetric, convertem PNG para GIF e enviam para a pasta `/ICONS` do relógio.
+
+## Rodando o hub sempre (launchd, opcional)
+
+Não é necessário para o relógio funcionar. Serve para manter o endpoint de métricas e o futebol no ar enquanto o Mac estiver ligado.
 
 ```sh
 make build
@@ -123,8 +181,8 @@ launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/dev.omarco.awtrix-hub.pl
 tail -f ~/Library/Logs/awtrix-hub.log
 ```
 
-Quando o Mac dorme, as atualizações param. Os apps usam `lifetime`, então somem do relógio em vez de ficar mostrando dado velho.
+Quando o Mac dorme, o hub para. Os scripts do relógio percebem e voltam a buscar direto. Os apps empurrados pelo hub (futebol) usam `lifetimeMs`, então somem em vez de ficar mostrando dado velho.
 
 ## Ideias para depois
 
-Clima e alerta de chuva · dólar/BTC · próxima reunião · CI e PRs · Spotify tocando · Pomodoro pelos botões · modo noturno · espectadores em live · migrar para um Raspberry Pi · MQTT/Home Assistant.
+Clima e alerta de chuva · dólar/BTC · próxima reunião · CI e PRs · Spotify tocando · Pomodoro pelos botões · modo noturno · espectadores em live · views do vídeo novo do YouTube no script · MQTT/Home Assistant.
