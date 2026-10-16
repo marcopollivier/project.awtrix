@@ -31,6 +31,7 @@ jobs:
           key: berry-${{ runner.os }}-${{ env.BERRY_COMMIT }}
       - if: steps.cache.outputs.cache-hit != 'true'
         run: |
+          sudo apt-get install -y -qq libreadline-dev >/dev/null
           git init -q src && cd src
           git fetch -q --depth 1 https://github.com/berry-lang/berry "$BERRY_COMMIT"
           git checkout -q FETCH_HEAD
