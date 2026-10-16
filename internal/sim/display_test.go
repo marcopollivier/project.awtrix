@@ -20,8 +20,8 @@ func newTestDisplay(c *clock) *Display {
 func TestLoopRotatesAndExpires(t *testing.T) {
 	c := &clock{t: time.Date(2026, 10, 9, 12, 0, 0, 0, time.UTC)}
 	d := newTestDisplay(c)
-	d.Upsert("a", awtrix.App{Text: awtrix.Plain("A"), Duration: 5})
-	d.Upsert("b", awtrix.App{Text: awtrix.Plain("B"), Duration: 5, Lifetime: 8})
+	d.Upsert("a", awtrix.App{Text: awtrix.Plain("A"), DurationMs: 5000})
+	d.Upsert("b", awtrix.App{Text: awtrix.Plain("B"), DurationMs: 5000, LifetimeMs: 8000})
 
 	if got := d.Snapshot().Name; got != "a" {
 		t.Fatalf("first app: %q", got)

@@ -41,14 +41,15 @@ Estado (variação do dia, metas já comemoradas, último placar) fica em `~/.aw
 
 - **Carrossel**: apps ativos e há quanto tempo cada um foi atualizado;
 - **Payload em exibição**: o JSON exato que iria para o relógio;
-- **Enviar payload**: teste qualquer JSON da [API do AWTRIX](https://blueforcer.github.io/awtrix3/#/api) (nome vazio = notificação);
+- **Enviar payload**: teste qualquer JSON da [API do AWTRIX NG](https://blueforcer.github.io/awtrix-ng/esp32/reference/payload/) (nome vazio = notificação);
 - **Som**: marque a caixa para ouvir os toques RTTTL (o buzzer do relógio).
 
-Ele aceita os mesmos endpoints do relógio, então dá para testar com `curl`. O relógio exige o cabeçalho `Content-Type: application/json`; sem ele, responde `ErrorParsingJson`:
+Ele aceita os mesmos endpoints do relógio com [AWTRIX NG](https://blueforcer.github.io/awtrix-ng/esp32/reference/http/), então dá para testar com `curl`. Como no relógio, exige `Content-Type: application/json` (sem ele: `415`) e recusa chaves desconhecidas, como as do AWTRIX 3 (`422`):
 
 ```sh
-curl -X POST -H 'Content-Type: application/json' 'localhost:7070/api/custom?name=teste' -d '{"text":"OLA","icon":"2799"}'
-curl -X POST -H 'Content-Type: application/json' localhost:7070/api/notify -d '{"text":"GOOOL","rainbow":true,"repeat":1}'
+curl -X PUT -H 'Content-Type: application/json' localhost:7070/api/v1/apps/pushed/teste -d '{"text":"OLA","icon":"2799"}'
+curl -X POST -H 'Content-Type: application/json' localhost:7070/api/v1/notifications -d '{"text":"GOOOL","textColor":"palette","palette":"Rainbow","repeat":1}'
+curl -X DELETE localhost:7070/api/v1/apps/teste
 ```
 
 A fonte e o tempo de rolagem são aproximações do relógio. Ajuste comparando lado a lado quando o aparelho estiver com AWTRIX 3 (coloque os dois em `targets`).

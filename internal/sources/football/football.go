@@ -271,12 +271,11 @@ func (s *Source) events(prev, cur *state.Match) []awtrix.Notification {
 		for range cur.Ours - prev.Ours {
 			ns = append(ns, awtrix.Notification{
 				App: awtrix.App{
-					Text:    awtrix.Plain("GOOOL DO " + s.cfg.Name + "! " + s.score(cur)),
-					Icon:    s.icons("goal"),
-					Rainbow: true,
-					Repeat:  2,
-				},
-				RTTTL: "gol:d=8,o=5,b=200:c6,c6,c6,4g,a,4c6,p,c6,c6,c6,4g,a,2c6",
+					Text:   awtrix.Plain("GOOOL DO " + s.cfg.Name + "! " + s.score(cur)),
+					Icon:   s.icons("goal"),
+					Repeat: 2,
+				}.WithRainbow(),
+				Sound: &awtrix.Sound{RTTTL: "gol:d=8,o=5,b=200:c6,c6,c6,4g,a,4c6,p,c6,c6,c6,4g,a,2c6"},
 			})
 		}
 		for range cur.Theirs - prev.Theirs {
@@ -293,15 +292,15 @@ func (s *Source) events(prev, cur *state.Match) []awtrix.Notification {
 }
 
 func (s *Source) note(text, color string, sound bool) awtrix.Notification {
-	n := awtrix.Notification{App: awtrix.App{Text: awtrix.Plain(text), Icon: s.icons("football"), Color: color, Repeat: 1}}
+	n := awtrix.Notification{App: awtrix.App{Text: awtrix.Plain(text), Icon: s.icons("football"), TextColor: color, Repeat: 1}}
 	if sound {
-		n.RTTTL = "apito:d=4,o=6,b=180:8c,p,2c"
+		n.Sound = &awtrix.Sound{RTTTL: "apito:d=4,o=6,b=180:8c,p,2c"}
 	}
 	return n
 }
 
 func (s *Source) render(m *state.Match, now time.Time) *awtrix.App {
-	app := &awtrix.App{Icon: s.icons("football"), Lifetime: int((postWindow + time.Hour).Seconds())}
+	app := &awtrix.App{Icon: s.icons("football"), LifetimeMs: int((postWindow + time.Hour).Milliseconds())}
 	switch s.phaseOf(m, now) {
 	case None:
 		return nil
@@ -317,13 +316,13 @@ func (s *Source) render(m *state.Match, now time.Time) *awtrix.App {
 	case Pre:
 		mins := max(0, int(m.Date.Sub(now).Minutes()))
 		app.Text = awtrix.Plain(fmt.Sprintf("%s EM %dM", m.Opponent, mins))
-		app.Color = "#FFD700"
+		app.TextColor = "#FFD700"
 	case Live:
 		app.Text = awtrix.Colored(awtrix.Frag(s.score(m)+" ", "#FFFFFF"), awtrix.Frag(m.Clock, "#00FF66"))
-		app.Duration = 15
+		app.DurationMs = 15_000
 	case Post:
 		app.Text = awtrix.Plain(s.score(m))
-		app.Color = s.resultColor(m)
+		app.TextColor = s.resultColor(m)
 	}
 	return app
 }

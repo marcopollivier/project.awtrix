@@ -212,7 +212,7 @@ func (s *Scheduler) counter(m sources.Metric) (*awtrix.App, *awtrix.Notification
 	}
 	app := &awtrix.App{Text: awtrix.Colored(frags...), Icon: m.Icon}
 	if pct, ok := rule.Progress(m.Value); ok {
-		app.Progress, app.ProgressC, app.ProgressBC = new(pct), colors.Bar, "#202020"
+		app.Progress, app.ProgressColor, app.ProgressTrackColor = new(pct), colors.Bar, "#202020"
 	}
 	s.withDefaults(app)
 
@@ -222,20 +222,19 @@ func (s *Scheduler) counter(m sources.Metric) (*awtrix.App, *awtrix.Notification
 	s.log.Info("milestone reached", "metric", m.Key, "milestone", reached)
 	return app, &awtrix.Notification{
 		App: awtrix.App{
-			Text:    awtrix.Plain(m.Label + " " + render.Count(reached) + "!"),
-			Icon:    s.cfg.Icon("party"),
-			Rainbow: true,
-			Repeat:  3,
-		},
-		RTTTL: "party:d=16,o=5,b=180:c,e,g,c6,8p,g,2c6",
+			Text:   awtrix.Plain(m.Label + " " + render.Count(reached) + "!"),
+			Icon:   s.cfg.Icon("party"),
+			Repeat: 3,
+		}.WithRainbow(),
+		Sound: &awtrix.Sound{RTTTL: "party:d=16,o=5,b=180:c,e,g,c6,8p,g,2c6"},
 	}
 }
 
 func (s *Scheduler) withDefaults(a *awtrix.App) {
-	if a.Duration == 0 {
-		a.Duration = s.cfg.Defaults.Duration
+	if a.DurationMs == 0 {
+		a.DurationMs = s.cfg.Defaults.Duration * 1000
 	}
-	if a.Lifetime == 0 {
-		a.Lifetime = s.cfg.Defaults.Lifetime
+	if a.LifetimeMs == 0 {
+		a.LifetimeMs = s.cfg.Defaults.Lifetime * 1000
 	}
 }

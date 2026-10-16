@@ -1,15 +1,17 @@
-// Package sim is a browser simulator for the AWTRIX 3 clock. It speaks the same
+// Package sim is a browser simulator for the AWTRIX NG clock. It speaks the same
 // HTTP API as the device (the subset this project uses), so the hub can target
 // it by URL, and streams what would be on screen to a canvas over SSE.
 package sim
 
 import (
+	"bytes"
 	"embed"
 	"encoding/json"
 	"io"
 	"io/fs"
 	"log/slog"
 	"net/http"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -42,13 +44,20 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /events", s.events)
 	mux.HandleFunc("GET /icons/{id}", s.icon)
 
-	// AWTRIX 3 API subset
-	mux.HandleFunc("POST /api/custom", s.custom)
-	mux.HandleFunc("POST /api/notify", s.notify)
-	mux.HandleFunc("POST /api/notify/dismiss", func(w http.ResponseWriter, r *http.Request) { s.disp.Dismiss() })
-	mux.HandleFunc("POST /api/nextapp", func(w http.ResponseWriter, r *http.Request) { s.disp.Skip() })
-	mux.HandleFunc("GET /api/loop", func(w http.ResponseWriter, r *http.Request) { writeJSON(w, s.disp.Loop()) })
-	mux.HandleFunc("GET /api/stats", func(w http.ResponseWriter, r *http.Request) {
+	// AWTRIX NG API subset
+	mux.HandleFunc("PUT /api/v1/apps/pushed/{name}", s.pushed)
+	mux.HandleFunc("DELETE /api/v1/apps/{name}", s.remove)
+	mux.HandleFunc("POST /api/v1/notifications", s.notify)
+	mux.HandleFunc("DELETE /api/v1/notifications/active", func(w http.ResponseWriter, r *http.Request) { s.disp.Dismiss(); ok(w) })
+	mux.HandleFunc("POST /api/v1/apps/next", func(w http.ResponseWriter, r *http.Request) { s.disp.Skip(); ok(w) })
+	mux.HandleFunc("GET /api/v1/apps", func(w http.ResponseWriter, r *http.Request) {
+		apps := []map[string]any{}
+		for _, name := range s.disp.Loop() {
+			apps = append(apps, map[string]any{"name": name, "origin": "pushed", "enabled": true, "inLoop": true})
+		}
+		writeJSON(w, apps)
+	})
+	mux.HandleFunc("GET /api/v1/version", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, map[string]any{"version": "simulator", "app": s.disp.Current()})
 	})
 	return mux
@@ -57,37 +66,76 @@ func (s *Server) Handler() http.Handler {
 // Run drives the display loop until stop is closed.
 func (s *Server) Run(stop <-chan struct{}) { s.disp.Run(stop) }
 
-func (s *Server) custom(w http.ResponseWriter, r *http.Request) {
-	name := r.URL.Query().Get("name")
-	if name == "" {
-		http.Error(w, "missing name", http.StatusBadRequest)
-		return
-	}
-	body, _ := io.ReadAll(r.Body)
-	if len(strings.TrimSpace(string(body))) == 0 {
-		s.disp.Remove(name)
-		s.logRequest("custom", name, "removed")
+func (s *Server) pushed(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+	body, okBody := readJSON(w, r)
+	if !okBody {
 		return
 	}
 	var app awtrix.App
-	if err := json.Unmarshal(body, &app); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+	if err := strictUnmarshal(body, &app); err != nil {
+		apiError(w, http.StatusUnprocessableEntity, "validationFailed", err.Error())
 		return
 	}
 	s.disp.Upsert(name, app)
-	s.logRequest("custom", name, string(body))
+	s.logRequest("pushed", name, string(body))
+	ok(w)
+}
+
+func (s *Server) remove(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+	if !slices.Contains(s.disp.Loop(), name) {
+		apiError(w, http.StatusNotFound, "notFound", "no such app")
+		return
+	}
+	s.disp.Remove(name)
+	s.logRequest("delete", name, "")
+	ok(w)
 }
 
 func (s *Server) notify(w http.ResponseWriter, r *http.Request) {
-	body, _ := io.ReadAll(r.Body)
+	body, okBody := readJSON(w, r)
+	if !okBody {
+		return
+	}
 	var n awtrix.Notification
-	if err := json.Unmarshal(body, &n); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+	if err := strictUnmarshal(body, &n); err != nil {
+		apiError(w, http.StatusUnprocessableEntity, "validationFailed", err.Error())
 		return
 	}
 	s.disp.Notify(n)
 	s.logRequest("notify", "", string(body))
+	ok(w)
 }
+
+// readJSON enforces what the clock enforces: a JSON content type and a body.
+func readJSON(w http.ResponseWriter, r *http.Request) ([]byte, bool) {
+	if mt, _, _ := strings.Cut(r.Header.Get("Content-Type"), ";"); strings.TrimSpace(mt) != "application/json" {
+		apiError(w, http.StatusUnsupportedMediaType, "unsupportedMediaType", "Content-Type must be application/json")
+		return nil, false
+	}
+	body, _ := io.ReadAll(io.LimitReader(r.Body, 8192+1))
+	if len(body) > 8192 {
+		apiError(w, http.StatusRequestEntityTooLarge, "payloadTooLarge", "payload over 8192 bytes")
+		return nil, false
+	}
+	return body, true
+}
+
+// strictUnmarshal rejects unknown keys, like the clock (which answers 422).
+func strictUnmarshal(b []byte, v any) error {
+	dec := json.NewDecoder(bytes.NewReader(b))
+	dec.DisallowUnknownFields()
+	return dec.Decode(v)
+}
+
+func apiError(w http.ResponseWriter, status int, code, msg string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	json.NewEncoder(w).Encode(map[string]any{"error": map[string]string{"code": code, "message": msg}})
+}
+
+func ok(w http.ResponseWriter) { writeJSON(w, map[string]bool{"ok": true}) }
 
 func (s *Server) icon(w http.ResponseWriter, r *http.Request) {
 	ic, err := s.icons.Get(r.Context(), r.PathValue("id"))
