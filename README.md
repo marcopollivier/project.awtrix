@@ -29,11 +29,14 @@ make dev                      # hub + simulador → http://localhost:7070
 | `make mock` | **tudo com dados de mentira**: contadores subindo, metas, jogo do Vasco; sem chaves |
 | `make replay` | replay de um jogo do Vasco gravado (gols, intervalo, fim) no simulador |
 | `awtrix-hub icons` | envia os ícones da config para o relógio (o `run` também faz isso ao iniciar) |
-| `awtrix-hub set linkedin 2890` | atualiza o contador manual do LinkedIn |
+| `awtrix-hub set linkedin 2890` | atualiza o contador manual do LinkedIn (e o script do relógio, se `device.url` estiver definido) |
+| `awtrix-hub deploy` | instala `scripts/*.ax` no relógio (AWTRIX NG) e preenche as configurações a partir da config e do `.env` |
 | `awtrix-hub run --only github --debug` | roda só uma fonte, com logs detalhados |
 | `make test` | testes |
 
 Estado (variação do dia, metas já comemoradas, último placar) fica em `~/.awtrix-hub/`.
+
+Com `api.addr` definido (ex.: `0.0.0.0:7080`), o `run` também serve `GET /api/v1/metrics` com o último valor de cada contador. É daí que os scripts do relógio leem quando o hub está no ar.
 
 ## O simulador
 

@@ -21,6 +21,9 @@ type Config struct {
 	IconsDir string            `yaml:"icons_dir"` // project icons (<name>.gif), relative to the config file
 	Colors   Colors            `yaml:"colors"`
 	Sim      Sim               `yaml:"sim"`
+	Device   Device            `yaml:"device"`
+	API      API               `yaml:"api"`
+	Scripts  string            `yaml:"scripts_dir"` // Berry apps installed by `deploy`, relative to the config file
 	Sources  Sources           `yaml:"sources"`
 	Location *time.Location    `yaml:"-"`
 }
@@ -39,6 +42,19 @@ type Colors struct {
 
 type Sim struct {
 	Addr string `yaml:"addr"`
+}
+
+// Device is the clock running AWTRIX NG, used by `deploy` and `set`.
+type Device struct {
+	URL  string `yaml:"url"`
+	User string `yaml:"-"` // AWTRIX_USER (when authEnabled is on)
+	Pass string `yaml:"-"` // AWTRIX_PASS
+}
+
+// API is the optional metrics endpoint the clock's scripts read from.
+type API struct {
+	Addr      string `yaml:"addr"`       // where `run` listens, e.g. 0.0.0.0:7080 ("" = off)
+	PublicURL string `yaml:"public_url"` // how the clock reaches it, e.g. http://192.168.0.10:7080
 }
 
 type Milestones struct {
@@ -108,6 +124,11 @@ func Load(path string) (*Config, error) {
 	if !filepath.IsAbs(c.IconsDir) {
 		c.IconsDir = filepath.Join(filepath.Dir(path), c.IconsDir)
 	}
+	if !filepath.IsAbs(c.Scripts) {
+		c.Scripts = filepath.Join(filepath.Dir(path), c.Scripts)
+	}
+	c.Device.User = os.Getenv("AWTRIX_USER")
+	c.Device.Pass = os.Getenv("AWTRIX_PASS")
 	c.Sources.GitHub.Token = os.Getenv("GITHUB_TOKEN")
 	c.Sources.YouTube.APIKey = os.Getenv("YOUTUBE_API_KEY")
 	c.Sources.Instagram.Token = os.Getenv("INSTAGRAM_TOKEN")
@@ -125,6 +146,7 @@ func Default() *Config {
 		Colors:   Colors{Text: "#FFFFFF", Up: "#00FF66", Down: "#FF3333", Bar: "#00A2FF"},
 		Sim:      Sim{Addr: "localhost:7070"},
 		IconsDir: "icons",
+		Scripts:  "scripts",
 		Icons: map[string]string{
 			"github": "21802", "stars": "gh_stars", "youtube": "youtube", "instagram": "36659",
 			"linkedin": "32288", "football": "26316", "goal": "8530", "party": "9554",

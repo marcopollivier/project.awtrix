@@ -1,22 +1,33 @@
 # Copie para config.yaml e ajuste. Segredos ficam no .env (veja .env.example).
 
-# Para onde enviar: simulador, relógio, ou os dois (espelhado).
+# O relógio (AWTRIX NG) roda os scripts de scripts/ e busca os dados sozinho:
+# `awtrix-hub deploy` instala e configura. O hub é opcional.
+device:
+  url: ""                          # ex.: http://192.168.0.50 (AWTRIX_USER/AWTRIX_PASS no .env se a interface tiver senha)
+scripts_dir: scripts
+
+# Endpoint de métricas: com o hub no ar, os scripts leem daqui; sem ele, buscam direto.
+api:
+  addr: ""                         # ex.: 0.0.0.0:7080 (vazio = desligado)
+  public_url: ""                   # como o relógio chega no hub, ex.: http://192.168.0.10:7080
+
+# Para onde o `run` empurra apps prontos. Por padrão só o simulador: no relógio
+# quem mostra os contadores são os scripts (empurrar para ele duplicaria os apps).
 targets:
   - http://localhost:7070          # simulador (awtrix-hub sim)
-  # - http://192.168.0.50          # relógio com AWTRIX 3 (depois do flash)
 
 timezone: America/Sao_Paulo
 data_dir: ~/.awtrix-hub            # state.json, manual.json, cache de ícones
 
 defaults:
   duration: 7                      # segundos de cada app na tela
-  lifetime: 3600                   # app some do relógio se ficar 1h sem atualização (Mac dormindo)
+  lifetime: 3600                   # app empurrado some se ficar 1h sem atualização (Mac dormindo)
 
 sim:
   addr: localhost:7070
 
 # Ícones: ID da LaMetric (https://developer.lametric.com/icons) ou nome de um GIF 8x8 em icons_dir.
-# `awtrix-hub icons` (e o run ao iniciar) envia todos para o relógio.
+# `awtrix-hub icons` (e o run/deploy ao iniciar) envia todos para o relógio.
 icons_dir: icons
 icons:
   github: "21802"
