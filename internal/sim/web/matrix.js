@@ -49,10 +49,14 @@ function paint() {
 // ---------- drawing ----------
 function hue(h) { return `hsl(${h % 360} 100% 55%)`; }
 
+// AWTRIX NG: text is a string or [{text, color}]; textColor "palette" + palette "Rainbow" is the rainbow.
+const isRainbow = app => app.textColor === 'palette' && app.palette === 'Rainbow';
+const baseColor = app => (app.textColor && app.textColor !== 'palette' ? app.textColor : '#FFFFFF');
+
 function fragments(app) {
   const t = app.text;
-  if (Array.isArray(t)) return t.map(f => ({ t: f.t, c: f.c || app.color || '#FFFFFF' }));
-  return [{ t: t || '', c: app.color || '#FFFFFF' }];
+  if (Array.isArray(t)) return t.map(f => ({ t: f.text, c: f.color || baseColor(app) }));
+  return [{ t: t || '', c: baseColor(app) }];
 }
 
 function drawText(app, x0, areaX, areaW, now) {
@@ -61,7 +65,7 @@ function drawText(app, x0, areaX, areaW, now) {
   for (const f of frags) {
     for (const ch of normalize(f.t)) {
       const g = glyph(ch);
-      const color = app.rainbow ? hue(i * 30 + now / 8) : f.c;
+      const color = isRainbow(app) ? hue(i * 30 + now / 8) : f.c;
       for (let r = 0; r < 5; r++) {
         for (let c = 0; c < g[r].length; c++) {
           const px = x + c;
@@ -110,7 +114,7 @@ function drawProgress(app, areaX) {
   if (app.progress === undefined || app.progress === null || app.progress < 0) return;
   const w = W - areaX;
   const filled = Math.round((w * Math.min(100, app.progress)) / 100);
-  for (let x = 0; x < w; x++) set(areaX + x, 7, x < filled ? (app.progressC || '#00FF00') : (app.progressBC || '#202020'));
+  for (let x = 0; x < w; x++) set(areaX + x, 7, x < filled ? (app.progressColor || '#00FF00') : (app.progressTrackColor || '#202020'));
 }
 
 function render(now) {
@@ -123,11 +127,11 @@ function render(now) {
     if (hasIcon) drawIcon(app.icon, now);
 
     const tw = textWidth(typeof app.text === 'string' ? app.text : fragments(app).map(f => f.t).join(''));
-    const blinkOff = app.blinkText && Math.floor((now - shownAt) / app.blinkText) % 2 === 1;
+    const blinkOff = app.textBlinkMs && Math.floor((now - shownAt) / app.textBlinkMs) % 2 === 1;
     if (!blinkOff) {
       let x;
-      if (tw <= areaW || app.noScroll) {
-        x = app.center === false ? areaX : areaX + Math.floor((areaW - tw) / 2);
+      if (tw <= areaW || app.scroll?.mode === 'static') {
+        x = app.textAlign === 'start' ? areaX : areaX + Math.floor((areaW - tw) / 2);
       } else {
         const span = tw + areaW;
         x = areaX + areaW - (Math.floor((now - shownAt) / SCROLL_MS) % span);
@@ -139,7 +143,7 @@ function render(now) {
     // idle clock, like the built-in time app
     const d = new Date();
     const t = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-    drawText({ text: t, color: '#555' }, Math.floor((W - textWidth(t)) / 2), 0, W, now);
+    drawText({ text: t, textColor: '#555' }, Math.floor((W - textWidth(t)) / 2), 0, W, now);
   }
   paint();
   requestAnimationFrame(render);
@@ -209,19 +213,22 @@ function connect() {
   };
 }
 
-const post = (path, body) => fetch(path, { method: 'POST', body: body ? JSON.stringify(body) : undefined });
-$('#next').onclick = () => post('/api/nextapp');
-$('#dismiss').onclick = () => post('/api/notify/dismiss');
-$('#test').onclick = () => post('/api/notify', {
-  text: 'GOOOL DO VASCO!', icon: '8530', rainbow: true, repeat: 1,
-  rtttl: 'gol:d=8,o=5,b=200:c6,c6,c6,4g,a,4c6,p,c6,c6,c6,4g,a,2c6',
+const api = (method, path, body) => fetch(path, {
+  method, body: body === undefined ? undefined : (typeof body === 'string' ? body : JSON.stringify(body)),
+  headers: body === undefined ? {} : { 'Content-Type': 'application/json' },
+});
+$('#next').onclick = () => api('POST', '/api/v1/apps/next');
+$('#dismiss').onclick = () => api('DELETE', '/api/v1/notifications/active');
+$('#test').onclick = () => api('POST', '/api/v1/notifications', {
+  text: 'GOOOL DO VASCO!', icon: '8530', textColor: 'palette', palette: 'Rainbow', repeat: 1,
+  sound: { rtttl: 'gol:d=8,o=5,b=200:c6,c6,c6,4g,a,4c6,p,c6,c6,c6,4g,a,2c6' },
 });
 $('#sound').onchange = e => { soundOn = e.target.checked; };
 $('#send').onclick = async () => {
   const name = $('#appname').value.trim();
   const body = $('#appjson').value;
-  const r = name ? await fetch(`/api/custom?name=${encodeURIComponent(name)}`, { method: 'POST', body })
-    : await fetch('/api/notify', { method: 'POST', body });
+  const r = name ? await api('PUT', `/api/v1/apps/pushed/${encodeURIComponent(name)}`, body)
+    : await api('POST', '/api/v1/notifications', body);
   $('#sendstatus').textContent = r.ok ? 'ok' : await r.text();
 };
 

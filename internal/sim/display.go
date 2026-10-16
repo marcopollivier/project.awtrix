@@ -164,7 +164,7 @@ func (d *Display) step() (changed bool) {
 
 	before := len(d.apps)
 	d.apps = slices.DeleteFunc(d.apps, func(e *entry) bool {
-		return e.App.Lifetime > 0 && now.Sub(e.UpdatedAt) > time.Duration(e.App.Lifetime)*time.Second
+		return e.App.LifetimeMs > 0 && now.Sub(e.UpdatedAt) > time.Duration(e.App.LifetimeMs)*time.Millisecond
 	})
 	if len(d.apps) != before {
 		d.cur, changed = 0, true
@@ -197,8 +197,8 @@ func (d *Display) showNotif(n awtrix.Notification) {
 		return
 	}
 	dur := notifyDuration
-	if n.Duration > 0 {
-		dur = time.Duration(n.Duration) * time.Second
+	if n.DurationMs > 0 {
+		dur = time.Duration(n.DurationMs) * time.Millisecond
 	}
 	if n.Repeat > 0 { // scroll the text n times
 		px := len([]rune(n.Text.String()))*charWidth + 32
@@ -215,8 +215,8 @@ func (d *Display) curDuration() time.Duration {
 }
 
 func (d *Display) duration(a awtrix.App) time.Duration {
-	if a.Duration > 0 {
-		return time.Duration(a.Duration) * time.Second
+	if a.DurationMs > 0 {
+		return time.Duration(a.DurationMs) * time.Millisecond
 	}
 	return defaultDuration
 }
@@ -243,7 +243,7 @@ func (d *Display) Snapshot() Screen {
 	switch {
 	case d.notif != nil:
 		app := d.notif.App
-		s.Kind, s.App, s.Sound, s.Hold = "notify", &app, d.notif.RTTTL, d.notif.Hold
+		s.Kind, s.App, s.Sound, s.Hold = "notify", &app, d.notif.RTTTL(), d.notif.Hold
 	case len(d.apps) > 0:
 		app := d.apps[d.cur].App
 		s.Kind, s.Name, s.App = "app", d.apps[d.cur].Name, &app

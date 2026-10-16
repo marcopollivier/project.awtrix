@@ -1,4 +1,4 @@
-// Command awtrix-hub feeds an AWTRIX 3 clock (Ulanzi TC001) with social counters
+// Command awtrix-hub feeds an AWTRIX NG clock (Ulanzi TC001) with social counters
 // and live football, and ships a browser simulator of the clock.
 //
 //	awtrix-hub sim                     # simulator on http://localhost:7070
@@ -188,7 +188,9 @@ func cmdRun(ctx context.Context, args []string, once bool) error {
 			return fmt.Errorf("simulador não subiu em %s", cfg.Sim.Addr)
 		}
 		simURL := "http://" + cfg.Sim.Addr
-		if !slices.Contains(cfg.Targets, simURL) {
+		if *useMock {
+			cfg.Targets = []string{simURL} // fake data never reaches the real clock
+		} else if !slices.Contains(cfg.Targets, simURL) {
 			cfg.Targets = append(cfg.Targets, simURL)
 		}
 	}

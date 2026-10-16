@@ -62,7 +62,7 @@ func (s *Source) Fetch(ctx context.Context, now time.Time) (sources.Output, erro
 		if now.Sub(s.alertedAt) > 24*time.Hour {
 			s.alertedAt = now
 			return sources.Output{Notifications: []awtrix.Notification{{
-				App: awtrix.App{Text: awtrix.Plain("TOKEN INSTAGRAM INVALIDO"), Icon: s.icons("instagram"), Color: "#FF3333"},
+				App: awtrix.App{Text: awtrix.Plain("TOKEN INSTAGRAM INVALIDO"), Icon: s.icons("instagram"), TextColor: "#FF3333"},
 			}}}, nil
 		}
 		return sources.Output{}, err
