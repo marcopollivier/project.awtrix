@@ -1,7 +1,7 @@
 BIN := bin/awtrix-hub
 FIXTURE := internal/sources/football/testdata/match
 
-.PHONY: build test test-scripts sim run dev mock preview replay vet
+.PHONY: build test test-scripts sim run dev mock preview replay vet lint
 
 build:
 	go build -o $(BIN) ./cmd/awtrix-hub
@@ -11,6 +11,12 @@ test:
 
 vet:
 	go vet ./...
+
+# gofmt + vet + golangci-lint v2 (the same checks as the Go CI)
+GOLANGCI_LINT ?= golangci-lint
+lint: vet
+	@out=$$(gofmt -l .); [ -z "$$out" ] || { echo "Arquivos sem gofmt:"; echo "$$out"; exit 1; }
+	$(GOLANGCI_LINT) run ./...
 
 # scripts/*.ax (os apps que rodam no relógio) contra imitações do runtime do AWTRIX NG.
 # Precisa do interpretador Berry: git clone https://github.com/berry-lang/berry && make -C berry

@@ -80,7 +80,8 @@ func (ic *Icons) Raw(ctx context.Context, id string) ([]byte, error) {
 		return nil, fmt.Errorf("invalid icon id %q", id)
 	}
 	if ic.custom != "" {
-		if b, err := os.ReadFile(filepath.Join(ic.custom, id+".gif")); err == nil {
+		// id matched validID above, so it cannot leave the directory.
+		if b, err := os.ReadFile(filepath.Join(ic.custom, id+".gif")); err == nil { //nolint:gosec // G703
 			return b, nil
 		}
 	}
@@ -88,14 +89,14 @@ func (ic *Icons) Raw(ctx context.Context, id string) ([]byte, error) {
 		return nil, fmt.Errorf("icon %q: not in %s and not a LaMetric id", id, ic.custom)
 	}
 	path := filepath.Join(ic.dir, id)
-	if b, err := os.ReadFile(path); err == nil {
+	if b, err := os.ReadFile(path); err == nil { //nolint:gosec // G703: id matched lametricID
 		return b, nil
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, iconURL+id, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, iconURL+id, nil) //nolint:gosec // G704: fixed host, numeric id
 	if err != nil {
 		return nil, err
 	}
-	resp, err := ic.http.Do(req)
+	resp, err := ic.http.Do(req) //nolint:gosec // G704: see above
 	if err != nil {
 		return nil, err
 	}
@@ -107,8 +108,8 @@ func (ic *Icons) Raw(ctx context.Context, id string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := os.MkdirAll(ic.dir, 0o755); err == nil {
-		os.WriteFile(path, b, 0o644)
+	if err := os.MkdirAll(ic.dir, 0o755); err == nil { //nolint:gosec // G301: public icon cache
+		_ = os.WriteFile(path, b, 0o644) //nolint:gosec // G306: public icon cache; a miss downloads again
 	}
 	return b, nil
 }

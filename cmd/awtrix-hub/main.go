@@ -140,7 +140,7 @@ func serveSim(ctx context.Context, cfg *config.Config, addr string, log *slog.Lo
 	srv := &http.Server{Handler: s.Handler(), ReadHeaderTimeout: 5 * time.Second}
 	stop := make(chan struct{})
 	go s.Run(stop)
-	go func() {
+	go func() { //nolint:gosec // G118: shutdown runs after ctx is done
 		<-ctx.Done()
 		close(stop)
 		shutdown, cancel := context.WithTimeout(context.Background(), 2*time.Second)
