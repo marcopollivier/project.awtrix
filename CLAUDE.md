@@ -19,6 +19,7 @@ make test                  # go test ./...
 make vet
 go test ./internal/scheduler -run TestCounterDeltaProgressAndMilestone   # one test
 make test-scripts BERRY=/path/to/berry   # Berry scripts against NG stand-ins
+make lint-scripts BERRY=/path/to/berry   # compile every .ax, @config only in the header
 make dev                   # hub + simulator at http://localhost:7070
 make mock                  # fake data for every source, simulator only, throwaway state
 make replay                # recorded Vasco match in the simulator
