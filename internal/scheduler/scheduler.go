@@ -114,7 +114,7 @@ func (s *Scheduler) custom(ctx context.Context, name string, app *awtrix.App) {
 // RunOnce fetches every source a single time (used by `preview`).
 func (s *Scheduler) RunOnce(ctx context.Context) {
 	for _, src := range s.sources {
-		s.tick(ctx, src)
+		_ = s.tick(ctx, src) // tick logs its own failures
 	}
 }
 
@@ -182,7 +182,7 @@ func (s *Scheduler) counter(m sources.Metric) (*awtrix.App, *awtrix.Notification
 		reached int64
 		party   bool
 	)
-	s.store.Update(func(d *state.Data) {
+	err := s.store.Update(func(d *state.Data) {
 		c, ok := d.Counters[m.Key]
 		if !ok {
 			c = &state.Counter{Day: today, DayStart: m.Value, Celebrated: -1}
@@ -196,6 +196,9 @@ func (s *Scheduler) counter(m sources.Metric) (*awtrix.App, *awtrix.Notification
 		reached = c.Celebrated
 		delta = c.Value - c.DayStart
 	})
+	if err != nil {
+		s.log.Warn("state not saved", "metric", m.Key, "err", err)
+	}
 
 	colors := s.cfg.Colors
 	textColor := colors.Text

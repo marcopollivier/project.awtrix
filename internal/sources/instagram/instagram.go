@@ -115,6 +115,8 @@ func (s *Source) load() (tokenFile, error) {
 
 func (s *Source) save(tf tokenFile) {
 	b, _ := json.MarshalIndent(tf, "", "  ")
-	os.MkdirAll(filepath.Dir(s.tokenPath), 0o700)
-	os.WriteFile(s.tokenPath, b, 0o600)
+	// Best effort: if the file is not written, the next fetch starts from the
+	// seed token again and refreshes it once more.
+	_ = os.MkdirAll(filepath.Dir(s.tokenPath), 0o700)
+	_ = os.WriteFile(s.tokenPath, b, 0o600)
 }

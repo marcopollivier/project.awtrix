@@ -1,0 +1,40 @@
+version: "2"
+
+linters:
+  default: none
+  enable:
+    - errcheck
+    - govet
+    - staticcheck
+    - ineffassign
+    - unused
+    - gosec
+  settings:
+    errcheck:
+      # Errors nobody can act on: closing bodies, writing to a ResponseWriter,
+      # flags parsed with ExitOnError.
+      exclude-functions:
+        - (io.Closer).Close
+        - (io.Writer).Write
+        - (net/http.ResponseWriter).Write
+        - (*encoding/json.Encoder).Encode
+        - (*mime/multipart.Writer).Close
+        - (*flag.FlagSet).Parse
+        - fmt.Fprintf
+        - fmt.Fprintln
+        - (*net/http.Server).Close
+        - (*net/http.Server).Shutdown
+    gosec:
+      excludes:
+        - G104 # same as errcheck, which is tuned above
+        - G304 # file paths come from the user's own config and flags
+  exclusions:
+    presets:
+      - std-error-handling
+    rules:
+      - path: _test\.go
+        linters: [errcheck, gosec]
+
+formatters:
+  enable:
+    - gofmt

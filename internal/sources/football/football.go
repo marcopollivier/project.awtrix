@@ -113,7 +113,8 @@ func (s *Source) Fetch(ctx context.Context, now time.Time) (sources.Output, erro
 	var out sources.Output
 	if cur != nil {
 		out.Notifications = s.events(prev, cur)
-		s.store.Update(func(d *state.Data) { d.Match = cur })
+		// Best effort: the match stays in memory; the file only helps after a restart.
+		_ = s.store.Update(func(d *state.Data) { d.Match = cur })
 	}
 	s.phase = s.phaseOf(cur, now)
 	out.Apps = map[string]*awtrix.App{AppName: s.render(cur, now)}

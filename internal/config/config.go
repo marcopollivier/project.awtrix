@@ -197,7 +197,7 @@ func loadDotEnv(path string) {
 		}
 		k, v = strings.TrimSpace(k), strings.Trim(strings.TrimSpace(v), `"'`)
 		if _, set := os.LookupEnv(k); !set {
-			os.Setenv(k, v)
+			_ = os.Setenv(k, v) // fails only on an invalid key; such a line is just skipped
 		}
 	}
 }
