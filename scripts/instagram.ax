@@ -1,0 +1,71 @@
+# @name     Instagram
+# @desc     Seguidores da conta profissional (login do Instagram), com renovação semanal do token
+# @author   marcopollivier
+# @version  1.0
+# @requires counter
+# @config   token         text   "Token de longa duração" default="" maxlen=512 help="Conta profissional; o app renova sozinho toda semana"
+# @config   graph_version text   "Versão da API"          default="v26.0"
+# @config   icon          text   "Ícone"                  default="36659"
+# @config   step          number "Meta a cada"            default=500 min=0 max=1000000 help="0 desliga a barra e a comemoração"
+# @config   interval_min  number "Atualizar a cada"       default=30 min=1 max=1440 unit=min
+# @config   source        select "Fonte"                  options=auto,direct,hub default=auto help="auto: hub se estiver no ar, senão direto"
+import counter
+var Base = counter.Counter
+
+# Long-lived tokens last 60 days and can be refreshed once they are 24h old.
+# The current token lives in the store ("tok"); the one in the settings only
+# seeds it, and typing a different one there starts over from it, like the hub.
+class Instagram : Base
+  def init()
+    super(self).init(store, counter.cfg, "instagram_followers", "INSTAGRAM")
+  end
+
+  def direct(done)
+    var seed = self.st.get("token")
+    if seed == nil || seed == ""
+      done(nil)
+      return
+    end
+    var now = self.now()
+    var t = self.st.get("tok")
+    if t == nil || t.find("seed") != seed
+      t = {"t": seed, "seed": seed, "at": now}
+      self.st.set("tok", t)
+    elif t["at"] <= 0 && now > 0
+      t["at"] = now
+      self.st.set("tok", t)
+    end
+    if now > 0 && t["at"] > 0 && now - t["at"] > 7 * 86400
+      http.get("https://graph.instagram.com/refresh_access_token?grant_type=ig_refresh_token&access_token=" + t["t"], def (b, s)
+        var mm = (b != nil && s == 200) ? re.search("\"access_token\": *\"([^\"]+)\"", b) : nil
+        if mm != nil   # a failed refresh is not fatal: the token works until it expires
+          t["t"] = mm[1]
+          t["at"] = now
+          self.st.set("tok", t)
+          log("instagram: token renovado")
+        end
+        self.followers(t["t"], done)
+      end, {"find": "\"access_token\"", "keep": 512})
+    else
+      self.followers(t["t"], done)
+    end
+  end
+
+  def followers(tok, done)
+    http.get("https://graph.instagram.com/" + self.st.get("graph_version") +
+             "/me?fields=followers_count&access_token=" + tok, def (b, s)
+      if s == 400 || s == 401
+        # Expired/invalid token: warn on the clock at most once a day.
+        var now = self.now()
+        if now > 0 && now - self.st.get("alerted", 0) > 86400
+          self.st.set("alerted", now)
+          notify({"text": "TOKEN INSTAGRAM INVALIDO", "icon": self.icon, "textColor": 0xFF3333})
+        end
+      end
+      var mm = (b != nil && s == 200) ? re.search("\"followers_count\": *(\\d+)", b) : nil
+      done(mm != nil ? int(mm[1]) : nil)
+    end, {"find": "\"followers_count\"", "keep": 48})
+  end
+end
+
+return Instagram()

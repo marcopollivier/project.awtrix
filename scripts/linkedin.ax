@@ -1,0 +1,31 @@
+# @name     LinkedIn
+# @desc     Seguidores digitados à mão (o LinkedIn não tem API para perfil pessoal)
+# @author   marcopollivier
+# @version  1.0
+# @requires counter
+# @config   followers  number "Seguidores"   default=0 min=0 max=100000000 help="awtrix-hub set linkedin N atualiza daqui"
+# @config   icon       text   "Ícone"        default="32288"
+# @config   step       number "Meta a cada"  default=500 min=0 max=1000000 help="0 desliga a barra e a comemoração"
+# @config   stale_days number "Cinza depois de" default=30 min=1 max=365 unit=dias help="Sem alteração por esse tempo, o número fica cinza"
+import counter
+var Base = counter.Counter
+
+# The value is a setting: saving it restarts the app, which then reads it.
+# "Stale" counts from the last change of the value, not from the last read.
+class LinkedIn : Base
+  def init()
+    super(self).init(store, counter.cfg, "linkedin_followers", "LINKEDIN")
+    self.src = "direct"
+    self.period = 3600
+    self.on_change = true
+    self.stale_s = int(store.get("stale_days", 30)) * 86400
+    self.render()
+  end
+
+  def direct(done)
+    var v = int(self.st.get("followers", 0))
+    done(v > 0 ? v : nil)
+  end
+end
+
+return LinkedIn()

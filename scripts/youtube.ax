@@ -1,0 +1,35 @@
+# @name     YouTube
+# @desc     Inscritos no canal (YouTube Data API v3), com variação do dia e meta
+# @author   marcopollivier
+# @version  1.0
+# @requires counter
+# @config   handle       text   "Canal (@handle)"     default="omarcodev"
+# @config   api_key      text   "Chave da Data API"   default="" maxlen=256 help="Restrinja a chave à YouTube Data API v3"
+# @config   icon         text   "Ícone"               default="youtube"
+# @config   step         number "Meta a cada"         default=100 min=0 max=1000000 help="0 desliga a barra e a comemoração"
+# @config   interval_min number "Atualizar a cada"    default=15 min=1 max=1440 unit=min
+# @config   source       select "Fonte"               options=auto,direct,hub default=auto help="auto: hub se estiver no ar, senão direto"
+import counter
+var Base = counter.Counter
+
+class YouTube : Base
+  def init()
+    super(self).init(store, counter.cfg, "youtube_subs", "YOUTUBE")
+  end
+
+  # The public API rounds subscribers to 3 significant digits. ~1 quota unit per call.
+  def direct(done)
+    var k = self.st.get("api_key")
+    if k == nil || k == ""
+      done(nil)
+      return
+    end
+    http.get("https://www.googleapis.com/youtube/v3/channels?part=statistics&forHandle=" +
+             self.st.get("handle") + "&key=" + k, def (b, s)
+      var mm = (b != nil && s == 200) ? re.search("\"subscriberCount\": *\"(\\d+)\"", b) : nil
+      done(mm != nil ? int(mm[1]) : nil)
+    end, {"find": "\"subscriberCount\"", "keep": 48})
+  end
+end
+
+return YouTube()

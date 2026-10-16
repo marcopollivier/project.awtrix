@@ -1,0 +1,34 @@
+# @name     GitHub
+# @desc     Seguidores no GitHub, com variação do dia e barra até a próxima meta
+# @author   marcopollivier
+# @version  1.0
+# @requires counter
+# @config   user         text   "Usuário"           default="marcopollivier"
+# @config   token        text   "Token (opcional)"  default="" maxlen=256 help="Só leitura. Sem token: 60 consultas por hora"
+# @config   icon         text   "Ícone"             default="21802"
+# @config   step         number "Meta a cada"       default=100 min=0 max=1000000 help="0 desliga a barra e a comemoração"
+# @config   interval_min number "Atualizar a cada"  default=30 min=1 max=1440 unit=min
+# @config   source       select "Fonte"             options=auto,direct,hub default=auto help="auto: hub se estiver no ar, senão direto"
+import counter
+var Base = counter.Counter
+
+class GitHub : Base
+  def init()
+    super(self).init(store, counter.cfg, "github_followers", "GITHUB")
+  end
+
+  # /users/{user} is ~1.5 KB; keep only the window around "followers".
+  def direct(done)
+    var h = {"User-Agent": "awtrix-ng", "Accept": "application/vnd.github+json"}
+    var tok = self.st.get("token")
+    if tok != nil && tok != ""
+      h["Authorization"] = "Bearer " + tok
+    end
+    http.get("https://api.github.com/users/" + self.st.get("user"), def (b, s)
+      var mm = (b != nil && s == 200) ? re.search("\"followers\": *(\\d+)", b) : nil
+      done(mm != nil ? int(mm[1]) : nil)
+    end, {"headers": h, "find": "\"followers\":", "keep": 32})
+  end
+end
+
+return GitHub()
