@@ -1,0 +1,68 @@
+name: Berry
+
+on:
+  push:
+    branches: [main]
+    paths: ["scripts/**", "Makefile", ".github/workflows/berry.yml"]
+  pull_request:
+    paths: ["scripts/**", "Makefile", ".github/workflows/berry.yml"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: berry-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Berry is not packaged anywhere: build a pinned commit and cache the binary.
+  BERRY_COMMIT: 65fce31732a9bdb91cb42cfc86e2b40f16c57514
+  BERRY: ${{ github.workspace }}/.berry/berry
+
+jobs:
+  berry:
+    name: build berry
+    runs-on: ubuntu-latest
+    steps:
+      - id: cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .berry/berry
+          key: berry-${{ runner.os }}-${{ env.BERRY_COMMIT }}
+      - if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          git init -q src && cd src
+          git fetch -q --depth 1 https://github.com/berry-lang/berry "$BERRY_COMMIT"
+          git checkout -q FETCH_HEAD
+          make -j"$(nproc)"
+          mkdir -p ../.berry && cp berry ../.berry/berry
+
+  lint:
+    name: lint scripts
+    needs: berry
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .berry/berry
+          key: berry-${{ runner.os }}-${{ env.BERRY_COMMIT }}
+          fail-on-cache-miss: true
+      - run: make lint-scripts
+
+  test:
+    name: test scripts
+    needs: berry
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .berry/berry
+          key: berry-${{ runner.os }}-${{ env.BERRY_COMMIT }}
+          fail-on-cache-miss: true
+      - run: make test-scripts

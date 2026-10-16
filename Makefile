@@ -1,7 +1,7 @@
 BIN := bin/awtrix-hub
 FIXTURE := internal/sources/football/testdata/match
 
-.PHONY: build test test-scripts sim run dev mock preview replay vet lint
+.PHONY: build test test-scripts lint-scripts sim run dev mock preview replay vet lint
 
 build:
 	go build -o $(BIN) ./cmd/awtrix-hub
@@ -24,6 +24,11 @@ BERRY ?= berry
 test-scripts:
 	@command -v $(BERRY) >/dev/null || { echo "Berry não encontrado; use BERRY=/caminho/para/berry"; exit 1; }
 	$(BERRY) scripts/test/run.be
+
+# compila cada scripts/*.ax e confere o cabeçalho (@config antes do código, só o counter é @module)
+lint-scripts:
+	@command -v $(BERRY) >/dev/null || { echo "Berry não encontrado; use BERRY=/caminho/para/berry"; exit 1; }
+	$(BERRY) scripts/test/lint.be
 
 sim:
 	go run ./cmd/awtrix-hub sim
