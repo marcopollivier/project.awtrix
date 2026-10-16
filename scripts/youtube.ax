@@ -27,7 +27,7 @@ class YouTube : Base
     http.get("https://www.googleapis.com/youtube/v3/channels?part=statistics&forHandle=" +
              self.st.get("handle") + "&key=" + k, def (b, s)
       var mm = (b != nil && s == 200) ? re.search("\"subscriberCount\": *\"(\\d+)\"", b) : nil
-      done(mm != nil ? int(mm[1]) : nil)
+      done(mm != nil ? int(mm[1]) : nil, s)
     end, {"find": "\"subscriberCount\"", "keep": 48})
   end
 end
