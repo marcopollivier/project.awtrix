@@ -88,6 +88,8 @@ The base handles:
 
 Keys used by both runtimes must match: `github_followers`, `github_stars`, `youtube_subs`, `instagram_followers`, `linkedin_followers`.
 
+`testdata/parity.json` holds vectors both sides test (keys, formatting, delta, bar, parties): `internal/*/parity_test.go` in Go, `scripts_test.be` in Berry. A change to shared behavior updates the vectors, so both test suites fail until both sides follow. The `parity` skill (`.claude/skills/parity`) maps each Go file to its Berry twin and lists the known divergences.
+
 Firmware constraints that shape the code:
 - **8 KB per HTTP response, 96 KB of memory for all scripts.** Use the `find`/`keep` options and `re.search`/`re.matchall`, not `json.load`. Build nothing in `draw()`: text pieces and the bar are prepared in `render()`. Regexes allow optional spaces (`": *"`) because GitHub and Google pretty-print.
 - **Store scope:** apps pass their own `store` into the base (`self.st`) instead of the module calling `store`. That keeps it unambiguous whose settings and state are read. Module-level settings (hub URL, colors) are read at import into `counter.cfg`.

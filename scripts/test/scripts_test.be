@@ -18,14 +18,52 @@ def texts(app)  # the pieces as plain text, e.g. "794 +7"
   return s
 end
 
-# --- formatting, like render.Count in Go ---
+# --- parity with the Go hub: testdata/parity.json, also read by internal/*/parity_test.go ---
+import json
+var pf = open("testdata/parity.json")
+var parity = json.load(pf.read())
+pf.close()
+
 counter_with("")
 var c = counter.Counter(global.Store({}), counter.cfg, "k", "K")
-for tc : [[793, "793"], [4521, "4521"], [12345, "12.3K"], [12978, "13K"], [99999, "100K"],
-          [128000, "128K"], [1234567, "1.2M"], [12000000, "12M"], [-3, "-3"]]
+for tc : parity["count"]
   check("count " + str(tc[0]), c.count(tc[0]), tc[1])
 end
+for d : parity["known_divergences"]["count"]   # documented: once fixed, move them to "count"
+  check("known divergence " + str(d["value"]), c.count(d["value"]), d["berry"])
+end
 check("today", c.today(), 20261016)
+
+# delta and bar, as render() builds them from the stored state
+def rendered(step, v, day_start)
+  var app = counter.Counter(global.Store({"step": step}), counter.cfg, "k", "K")
+  app.st.set("state", {"v": v, "at": app.now(), "d": app.today(), "s": day_start, "c": -1})
+  app.render()
+  return app
+end
+for tc : parity["delta"]
+  var a = rendered(0, 100000000, 100000000 - tc[0])
+  var piece = size(a.parts) > 1 ? a.parts[1][0] : ""
+  check("delta " + str(tc[0]), piece, tc[1] == "" ? "" : " " + tc[1])
+end
+for tc : parity["progress"]
+  var a = rendered(tc["step"], tc["value"], tc["value"])
+  check("progress " + str(tc["value"]) + "/" + str(tc["step"]), a.pct, tc["pct"] == nil ? -1 : tc["pct"])
+end
+
+# parties: the same readings celebrate the same milestones
+for tc : parity["milestones"]
+  global.notes = []
+  var a = counter.Counter(global.Store({"step": tc["step"]}), counter.cfg, "k", "K")
+  var got = []
+  for v : tc["readings"]
+    var before = size(notes)
+    a.got(v, "test")
+    got.push(size(notes) > before ? a.st.get("state")["c"] : 0)
+  end
+  check("parties step " + str(tc["step"]), got, tc["party"])
+end
+global.notes = []
 
 # --- GitHub direct: baseline, then a new day with a milestone ---
 var gh = load("scripts/github.ax", {"user": "marco", "token": "", "icon": "21802", "step": 100, "interval_min": 30, "source": "auto"})
