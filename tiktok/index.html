@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- The address carries the authorization code: keep it out of Referer headers. -->
+<meta name="referrer" content="no-referrer">
+<title>Login do TikTok · project.awtrix</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font: 16px/1.6 system-ui, sans-serif; max-width: 40rem; margin: 3rem auto; padding: 0 1rem; }
+  textarea { width: 100%; box-sizing: border-box; font: 13px/1.4 ui-monospace, monospace; padding: .5rem; }
+  button { font: inherit; padding: .4rem 1rem; margin-top: .5rem; cursor: pointer; }
+</style>
+</head>
+<body>
+<h1>Quase lá</h1>
+<p id="msg">Copie o endereço abaixo e cole no terminal, onde o <code>awtrix-hub tiktok login</code> está esperando.</p>
+<textarea id="url" rows="5" readonly></textarea>
+<button id="copy" type="button">Copiar</button>
+<p><small>Nada desta página é enviado a lugar nenhum: o código só vale junto com o client secret, que fica no seu computador.</small></p>
+<script>
+  // Everything stays in the browser: no requests, no external scripts.
+  var box = document.getElementById("url");
+  box.value = location.href;
+  var q = new URLSearchParams(location.search);
+  if (q.get("error")) {
+    document.getElementById("msg").textContent = "O TikTok recusou a autorização (" + q.get("error") + "). Rode o login de novo.";
+  }
+  document.getElementById("copy").onclick = function () {
+    box.select();
+    (navigator.clipboard ? navigator.clipboard.writeText(box.value) : Promise.reject())
+      .catch(function () { document.execCommand("copy"); })
+      .then(function () { document.getElementById("copy").textContent = "Copiado"; });
+  };
+</script>
+</body>
+</html>
