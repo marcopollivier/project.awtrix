@@ -130,31 +130,54 @@ type Device interface {
 	PutScript(ctx context.Context, target, name string, src []byte) error
 	PatchAppConfig(ctx context.Context, target, name string, values map[string]any) error
 	Apps(ctx context.Context, target string) ([]awtrix.AppInfo, error)
+	Script(ctx context.Context, target, name string) ([]byte, bool, error)
+	Reboot(ctx context.Context, target string) error
+}
+
+type Options struct {
+	Only     []string // install names to deploy; empty means all
+	Force    bool     // reinstall scripts even when the clock has the same source
+	NoReboot bool     // skip the reboot after a module changed
 }
 
 // Retry is how long to wait when the clock answers 503 (a script is busy).
 var Retry = 2 * time.Second
 
 // Deploy installs scripts on target, applies settings and reports each
-// script's state. only (optional) limits it to these install names.
-func Deploy(ctx context.Context, d Device, target string, scripts []Script, settings map[string]Setting, only []string, log *slog.Logger) error {
-	var installed []string
+// script's state.
+//
+// A script the clock already has, byte for byte, is not reinstalled. Touching a
+// module (counter) makes every script that imports it recompile at once, which
+// fragments the heap until no block is left for TLS ("heap too tight for TLS"
+// in the logs, every HTTPS fetch skipped). So when a module was installed or
+// configured, Deploy ends with a reboot, which starts from a clean heap.
+func Deploy(ctx context.Context, d Device, target string, scripts []Script, settings map[string]Setting, opts Options, log *slog.Logger) error {
+	var deployed []string // installed or unchanged: both get their settings
+	moduleTouched := false
 	for _, s := range scripts {
 		set, known := settings[s.Name]
-		if len(only) > 0 && !slices.Contains(only, s.Name) {
+		if len(opts.Only) > 0 && !slices.Contains(opts.Only, s.Name) {
 			continue
 		}
 		if known && !set.Enabled {
 			log.Info("pulando (fonte desligada na config)", "script", s.Name)
 			continue
 		}
+		deployed = append(deployed, s.Name)
+		if !opts.Force {
+			// A failed read just means installing, as before.
+			if cur, found, err := d.Script(ctx, target, s.Name); err == nil && found && bytes.Equal(cur, s.Source) {
+				log.Info("script sem mudança", "script", s.Name)
+				continue
+			}
+		}
 		if err := retry(ctx, func() error { return d.PutScript(ctx, target, s.Name, s.Source) }); err != nil {
 			return fmt.Errorf("instalar %s: %w", s.Name, err)
 		}
 		log.Info("script instalado", "script", s.Name, "bytes", len(s.Source))
-		installed = append(installed, s.Name)
+		moduleTouched = moduleTouched || s.Module
 	}
-	for _, name := range installed {
+	for _, name := range deployed {
 		vals := settings[name].Values
 		if len(vals) == 0 {
 			continue
@@ -169,8 +192,17 @@ func Deploy(ctx context.Context, d Device, target string, scripts []Script, sett
 			return fmt.Errorf("configurar %s: %w", name, err)
 		}
 		log.Info("configuração aplicada", "script", name, "chaves", len(vals))
+		moduleTouched = moduleTouched || isModule(scripts, name)
 	}
-	return report(ctx, d, target, scripts, installed, log)
+	err := report(ctx, d, target, scripts, deployed, log)
+	if moduleTouched && !opts.NoReboot {
+		if rerr := d.Reboot(ctx, target); rerr != nil {
+			log.Warn("o relógio não reiniciou; reinicie pela interface para liberar a memória", "err", rerr)
+		} else {
+			log.Info("relógio reiniciando para liberar a memória (o counter foi reinstalado ou reconfigurado); os apps voltam em ~10 s")
+		}
+	}
+	return err
 }
 
 // report checks GET /api/v1/apps for compile or runtime errors.
