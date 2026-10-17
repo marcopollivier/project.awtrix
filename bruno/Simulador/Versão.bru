@@ -1,0 +1,15 @@
+meta {
+  name: Versão
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{sim_url}}/api/v1/version
+  body: none
+  auth: none
+}
+
+docs {
+  Responde `{"version":"simulator","app":"<app na tela>"}`. Só existe no simulador.
+}

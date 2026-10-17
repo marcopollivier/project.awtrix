@@ -1,0 +1,20 @@
+meta {
+  name: Listar ícones
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{clock_url}}/api/v1/files?dir=/ICONS
+  body: none
+  auth: basic
+}
+
+auth:basic {
+  username: {{clock_user}}
+  password: {{clock_pass}}
+}
+
+docs {
+  Arquivos de ícone no relógio: `{"files":[{"name":"/ICONS/tiktok.gif"}, ...]}`. O `deploy` só envia os que faltam.
+}

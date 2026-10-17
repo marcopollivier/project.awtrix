@@ -1,0 +1,20 @@
+meta {
+  name: Fechar notificação
+  type: http
+  seq: 2
+}
+
+delete {
+  url: {{clock_url}}/api/v1/notifications/active
+  body: none
+  auth: basic
+}
+
+auth:basic {
+  username: {{clock_user}}
+  password: {{clock_pass}}
+}
+
+docs {
+  Fecha a notificação que está na tela.
+}

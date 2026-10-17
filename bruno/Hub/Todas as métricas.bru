@@ -1,0 +1,19 @@
+meta {
+  name: Todas as métricas
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{hub_url}}/api/v1/metrics
+  body: none
+  auth: none
+}
+
+docs {
+  Todos os contadores conhecidos pelo hub. Tempos em segundos Unix.
+
+  ```json
+  {"now":1760650000,"metrics":{"github_followers":{"value":794,"updatedAt":1760649000}}}
+  ```
+}

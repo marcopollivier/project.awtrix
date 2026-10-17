@@ -1,0 +1,28 @@
+meta {
+  name: Notificação
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{sim_url}}/api/v1/notifications
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "text": "TIKTOK 3.5K!",
+    "icon": "9554",
+    "textColor": "palette",
+    "palette": "Rainbow",
+    "repeat": 3,
+    "sound": {"rtttl": "party:d=16,o=5,b=180:c,e,g,c6,8p,g,2c6"}
+  }
+}
+
+docs {
+  Interrompe a rotação. É a comemoração de meta do hub (`LABEL N!` em arco-íris com som).
+
+  Campos: os de um app, mais `hold`, `stack`, `wakeup` e `sound` (`{rtttl}`).
+}

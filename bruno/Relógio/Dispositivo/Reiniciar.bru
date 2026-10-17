@@ -1,0 +1,24 @@
+meta {
+  name: Reiniciar
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{clock_url}}/api/v1/device/reboot
+  body: none
+  auth: basic
+}
+
+headers {
+  Content-Type: application/json
+}
+
+auth:basic {
+  username: {{clock_user}}
+  password: {{clock_pass}}
+}
+
+docs {
+  Reinicia o relógio, como o botão da interface (POST JSON sem corpo). Os scripts voltam com o estado salvo em ~10 s.
+}

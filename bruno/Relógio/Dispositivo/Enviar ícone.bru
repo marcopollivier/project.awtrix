@@ -1,0 +1,24 @@
+meta {
+  name: Enviar ícone
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{clock_url}}/api/v1/files?dir=/ICONS
+  body: multipartForm
+  auth: basic
+}
+
+auth:basic {
+  username: {{clock_user}}
+  password: {{clock_pass}}
+}
+
+body:multipart-form {
+  file: @file(../icons/tiktok.gif)
+}
+
+docs {
+  Envia um GIF 8×8 como `/ICONS/<nome>.gif` (multipart, campo `file`). O nome do arquivo vira o ID do ícone usado em `icon`.
+}

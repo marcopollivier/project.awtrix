@@ -1,0 +1,20 @@
+meta {
+  name: Tela
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{clock_url}}/api/v1/display/screen
+  body: none
+  auth: basic
+}
+
+auth:basic {
+  username: {{clock_user}}
+  password: {{clock_pass}}
+}
+
+docs {
+  Os pixels da matriz 32×8 neste instante.
+}

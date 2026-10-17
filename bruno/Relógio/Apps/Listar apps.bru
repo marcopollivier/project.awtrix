@@ -1,0 +1,27 @@
+meta {
+  name: Listar apps
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{clock_url}}/api/v1/apps
+  body: none
+  auth: basic
+}
+
+auth:basic {
+  username: {{clock_user}}
+  password: {{clock_pass}}
+}
+
+docs {
+  Todos os apps. O `deploy` usa esta rota para achar erro de compilação:
+
+  ```json
+  [{"name":"tiktok","origin":"script","inLoop":true,"error":null},
+   {"name":"counter","origin":"module"}]
+  ```
+
+  Com erro, vem `"error":{"message":"...","line":7,"hook":"setup"}`.
+}

@@ -270,6 +270,22 @@ launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/dev.omarco.awtrix-hub.pl
 tail -f ~/Library/Logs/awtrix-hub.log
 ```
 
+## Contratos HTTP (Bruno)
+
+A pasta [`bruno/`](bruno) é uma coleção do [Bruno](https://www.usebruno.com) com todos os endpoints do projeto, documentados e com exemplos:
+
+- **Hub:** o endpoint de métricas que os scripts consultam.
+- **Simulador:** o pedaço da API do AWTRIX NG que ele imita.
+- **Relógio:** apps, notificações, scripts, logs, tela, reinício e ícones.
+
+Abra a pasta no Bruno e escolha o ambiente **Local**. A URL do relógio, o usuário e a senha são variáveis secretas: o Bruno guarda os valores só na sua máquina, e eles não vão para o git.
+
+Também dá para rodar pelo terminal, por exemplo contra o `make mock`:
+
+```sh
+cd bruno && npx @usebruno/cli run Simulador --env Local
+```
+
 ## Comandos
 
 | Comando | O que faz |

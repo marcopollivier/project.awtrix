@@ -1,0 +1,34 @@
+meta {
+  name: Instalar script
+  type: http
+  seq: 2
+}
+
+put {
+  url: {{clock_url}}/api/v1/apps/script/{{script}}
+  body: text
+  auth: basic
+}
+
+headers {
+  Content-Type: text/plain
+}
+
+auth:basic {
+  username: {{clock_user}}
+  password: {{clock_pass}}
+}
+
+body:text {
+  # @name     Exemplo
+  # @desc     Script de teste
+  # @author   marcopollivier
+  # @version  1.0
+  return nil
+}
+
+docs {
+  Instala ou substitui um script; o corpo é o código Berry (`text/plain`).
+
+  Reinstalar o módulo `counter` faz todos os scripts recompilarem juntos e pode fragmentar a memória (`heap too tight for TLS` nos logs). Nesse caso, reinicie o relógio. Prefira `awtrix-hub deploy`, que compara antes de instalar.
+}

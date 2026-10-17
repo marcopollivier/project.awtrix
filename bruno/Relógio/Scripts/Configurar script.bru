@@ -1,0 +1,30 @@
+meta {
+  name: Configurar script
+  type: http
+  seq: 3
+}
+
+patch {
+  url: {{clock_url}}/api/v1/apps/{{script}}/config
+  body: json
+  auth: basic
+}
+
+auth:basic {
+  username: {{clock_user}}
+  password: {{clock_pass}}
+}
+
+body:json {
+  {
+    "followers": 7430
+  }
+}
+
+docs {
+  Muda o `@config` de um script, que reinicia com os valores novos.
+
+  Toda chave enviada precisa existir como `# @config <chave>` no script, senão a resposta é 422. As chaves de cada script estão no cabeçalho de `scripts/<nome>.ax`, e o `deploy` monta os valores em `deploy.Settings`.
+
+  O exemplo muda o LinkedIn, igual a `awtrix-hub set linkedin 7430`.
+}

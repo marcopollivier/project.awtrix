@@ -1,0 +1,19 @@
+meta {
+  name: Listar apps
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{sim_url}}/api/v1/apps
+  body: none
+  auth: none
+}
+
+docs {
+  Apps na rotação:
+
+  ```json
+  [{"name":"tiktok_followers","origin":"pushed","enabled":true,"inLoop":true}]
+  ```
+}

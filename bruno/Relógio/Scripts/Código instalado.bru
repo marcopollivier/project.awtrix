@@ -1,0 +1,22 @@
+meta {
+  name: Código instalado
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{clock_url}}/api/v1/apps/script/{{script}}
+  body: none
+  auth: basic
+}
+
+auth:basic {
+  username: {{clock_user}}
+  password: {{clock_pass}}
+}
+
+docs {
+  Devolve o código-fonte instalado (`text/plain`), byte a byte igual ao que foi enviado. Script inexistente: 404.
+
+  O código não traz os valores do `@config`.
+}
