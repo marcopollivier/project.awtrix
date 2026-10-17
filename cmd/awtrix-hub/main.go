@@ -461,7 +461,7 @@ func cmdIcons(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
-	return syncIcons(ctx, cfg, awtrix.NewClient(cfg.Targets, log), log, *force)
+	return syncIcons(ctx, cfg, awtrix.NewClient(cfg.Targets, log).WithAuth(cfg.Device.User, cfg.Device.Pass), log, *force)
 }
 
 // syncIcons uploads the configured icons (LaMetric ids or project icons from
