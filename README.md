@@ -13,6 +13,19 @@ O relógio busca tudo **sozinho, pelo Wi-Fi**: não precisa de computador ligado
 
 ---
 
+## Redes suportadas
+
+| Rede | O que mostra | De onde vem | Atualiza a cada (padrão) | Token |
+|---|---|---|---|---|
+| GitHub | seguidores | API REST, sem login | 30 min | nenhum |
+| GitHub ⭐ | estrelas dos seus repositórios públicos (sem forks) | API GraphQL | 30 min | token só de leitura; expira na data que você escolher |
+| YouTube | inscritos (a API arredonda para 3 dígitos: `12.3K`) | YouTube Data API v3 | 15 min | chave de API, não expira |
+| Instagram | seguidores (conta profissional) | API do Instagram com login do Instagram | 30 min | renovado sozinho toda semana |
+| TikTok | seguidores | Display API oficial (app em sandbox) | 30 min | renovado sozinho todo dia |
+| LinkedIn | seguidores, digitados por você | manual (`awtrix-hub set linkedin N`) | quando você atualiza | nenhum |
+
+Todas funcionam direto no relógio, sem computador ligado. O intervalo muda em `sources.<rede>.interval` no `config.yaml`, e o que cada rede precisa para funcionar está em [Chaves das redes](#chaves-das-redes).
+
 ## O que aparece no relógio
 
 | | |
@@ -127,14 +140,14 @@ Pronto: pode desligar o computador. Para mudar algo, edite a config e rode `depl
 
 ## Chaves das redes
 
-| Rede | O que mostra | Precisa de |
-|---|---|---|
-| GitHub | seguidores | nada |
-| GitHub ⭐ | soma das estrelas dos seus repositórios (sem forks) | `GITHUB_TOKEN` |
-| YouTube | inscritos (a API arredonda para 3 dígitos: `12.3K`) | `YOUTUBE_API_KEY` |
-| Instagram | seguidores de conta profissional | `INSTAGRAM_TOKEN` |
-| TikTok | seguidores | `TIKTOK_CLIENT_KEY`/`SECRET` + `./bin/awtrix-hub tiktok login` |
-| LinkedIn | seguidores, digitados por você (não há API para perfil pessoal) | `./bin/awtrix-hub set linkedin 7430` |
+| Rede | Precisa de |
+|---|---|
+| GitHub | nada |
+| GitHub ⭐ | `GITHUB_TOKEN` |
+| YouTube | `YOUTUBE_API_KEY` |
+| Instagram | `INSTAGRAM_TOKEN` |
+| TikTok | `TIKTOK_CLIENT_KEY`/`SECRET` + `./bin/awtrix-hub tiktok login` |
+| LinkedIn | `./bin/awtrix-hub set linkedin 7430` (não há API para perfil pessoal) |
 
 O relógio não confere o certificado HTTPS das APIs, e quem estiver na sua rede consegue ler as chaves pela API do relógio. **Use chaves só de leitura** e, se quiser, ligue a senha da interface (*System → authEnabled*) e coloque `AWTRIX_USER`/`AWTRIX_PASS` no `.env`.
 
