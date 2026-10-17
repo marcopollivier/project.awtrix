@@ -116,7 +116,7 @@ The stubs are not the firmware. After changing a script, run `deploy` against th
 
 ## Working with the real clock
 
-Its address is `device.url` in `config.yaml`. The web UI has no password, by the user's choice.
+Its address is `device.url` in `config.yaml`. The web UI and the API require a login (Basic auth): the hub sends `AWTRIX_USER`/`AWTRIX_PASS` from `.env`, and anonymous calls get 401. To call the API with curl, source `.env` in a subshell and pass `-u "$AWTRIX_USER:$AWTRIX_PASS"` without printing the values.
 
 - Logs: `GET /api/v1/logs?after=N` (34 lines, each script logs where a value came from).
 - Script state: `GET /api/v1/apps/{name}/data`. The Instagram data includes the token, so don't echo it.
