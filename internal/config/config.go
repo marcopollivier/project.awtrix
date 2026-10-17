@@ -67,6 +67,7 @@ type Sources struct {
 	YouTube   YouTube   `yaml:"youtube"`
 	Instagram Instagram `yaml:"instagram"`
 	LinkedIn  LinkedIn  `yaml:"linkedin"`
+	TikTok    TikTok    `yaml:"tiktok"`
 	Football  Football  `yaml:"football"`
 }
 
@@ -102,6 +103,15 @@ type LinkedIn struct {
 	StaleAfter time.Duration `yaml:"stale_after"`
 }
 
+type TikTok struct {
+	Enabled      bool          `yaml:"enabled"`
+	Interval     time.Duration `yaml:"interval"`
+	Milestones   Milestones    `yaml:"milestones"`
+	RedirectURI  string        `yaml:"redirect_uri"` // https, registered in the TikTok app; used by `tiktok login`
+	ClientKey    string        `yaml:"-"`            // TIKTOK_CLIENT_KEY
+	ClientSecret string        `yaml:"-"`            // TIKTOK_CLIENT_SECRET
+}
+
 type Football struct {
 	Enabled bool     `yaml:"enabled"`
 	TeamID  string   `yaml:"team_id"`
@@ -132,6 +142,8 @@ func Load(path string) (*Config, error) {
 	c.Sources.GitHub.Token = os.Getenv("GITHUB_TOKEN")
 	c.Sources.YouTube.APIKey = os.Getenv("YOUTUBE_API_KEY")
 	c.Sources.Instagram.Token = os.Getenv("INSTAGRAM_TOKEN")
+	c.Sources.TikTok.ClientKey = os.Getenv("TIKTOK_CLIENT_KEY")
+	c.Sources.TikTok.ClientSecret = os.Getenv("TIKTOK_CLIENT_SECRET")
 	return c, c.Finish()
 }
 
@@ -149,13 +161,14 @@ func Default() *Config {
 		Scripts:  "scripts",
 		Icons: map[string]string{
 			"github": "21802", "stars": "gh_stars", "youtube": "youtube", "instagram": "36659",
-			"linkedin": "32288", "football": "26316", "goal": "8530", "party": "9554",
+			"linkedin": "32288", "tiktok": "tiktok", "football": "26316", "goal": "8530", "party": "9554",
 		},
 		Sources: Sources{
 			GitHub:    GitHub{Interval: 30 * time.Minute},
 			YouTube:   YouTube{Interval: 15 * time.Minute, LatestWindow: 48 * time.Hour},
 			Instagram: Instagram{Interval: 30 * time.Minute, GraphVer: "v26.0"},
 			LinkedIn:  LinkedIn{StaleAfter: 30 * 24 * time.Hour},
+			TikTok:    TikTok{Interval: 30 * time.Minute},
 			Football:  Football{TeamID: "3454", Abbrev: "VAS", Name: "VASCO", Leagues: []string{"bra.1"}},
 		},
 	}

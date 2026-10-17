@@ -196,6 +196,62 @@ http.answer('{"error":{}}', 401)
 check("alert at most once a day", size(notes), 1)
 check("invalid token waits the whole interval", ig.ticks, 1800)
 
+# --- TikTok: refresh first, rotated refresh token kept, 401 retries once, alert ---
+global.notes = []
+var tk_set = {"client_key": "ck", "client_secret": "cs", "refresh_token": "rft.seed", "icon": "tiktok", "step": 500, "interval_min": 30, "source": "auto"}
+var tk = load("scripts/tiktok.ax", tk_set)
+tick(tk)
+r = http.answer('{"access_token": "act.1", "expires_in": 86400, "open_id": "x", "refresh_expires_in": 31536000, "refresh_token": "rft.1", "scope": "user.info.basic,user.info.stats", "token_type": "Bearer"}', 200)
+check("tiktok refresh method", r["m"], "POST")
+check("tiktok refresh url", r["url"], "https://open.tiktokapis.com/v2/oauth/token/")
+check("tiktok refresh body", r["body"], "client_key=ck&client_secret=cs&grant_type=refresh_token&refresh_token=rft.seed")
+check("tiktok refresh form", r["opts"]["headers"]["Content-Type"], "application/x-www-form-urlencoded")
+r = http.answer('{"data":{"user":{"follower_count":1234}},"error":{"code":"ok","message":"","log_id":"x"}}', 200)
+check("tiktok info url", r["url"], "https://open.tiktokapis.com/v2/user/info/?fields=follower_count")
+check("tiktok bearer", r["opts"]["headers"]["Authorization"], "Bearer act.1")
+check("tiktok followers", texts(tk), "1234")
+check("rotated refresh token kept", tk.st.get("tok")["rt"], "rft.1")
+
+tick(tk)   # same day: no refresh
+r = http.answer('{"data":{"user":{"follower_count":1240}}}', 200)
+check("cached access token", r["m"] + " " + r["opts"]["headers"]["Authorization"], "GET Bearer act.1")
+
+T["epoch"] += 23 * 3600 + 1800   # less than 1h left
+tick(tk)
+r = http.answer('{"access_token":"act.2","expires_in":86400,"refresh_token":"rft.2"}', 200)
+check("refresh with the rotated token", r["body"], "client_key=ck&client_secret=cs&grant_type=refresh_token&refresh_token=rft.1")
+http.answer('{"data":{"user":{"follower_count":1241}}}', 200)
+
+tick(tk)   # revoked access token: refresh once and ask again
+http.answer('{"error":{"code":"access_token_invalid"}}', 401)
+r = http.answer('{"access_token":"act.3","expires_in":86400,"refresh_token":"rft.3"}', 200)
+check("401 refreshes", r["m"], "POST")
+r = http.answer('{"data":{"user":{"follower_count":1250}}}', 200)
+check("then asks again", r["opts"]["headers"]["Authorization"], "Bearer act.3")
+check("after retry", texts(tk), "1250 +16")
+
+T["epoch"] += 86400   # expired refresh token, reported with a 200 as TikTok may
+tick(tk)
+http.answer('{"error":"invalid_grant","error_description":"Refresh token is invalid or expired."}', 200)
+check("no info request after a failed refresh", size(http.queue), 0)
+check("tiktok invalid token alert", size(notes), 1)
+check("tiktok alert text", notes[0]["text"], "TOKEN TIKTOK INVALIDO")
+check("invalid refresh waits the whole interval", tk.ticks, 1800)
+tick(tk)
+http.answer('{"error":"invalid_grant"}', 400)
+check("tiktok alert at most once a day", size(notes), 1)
+
+tk_set["refresh_token"] = "rft.new"   # a new login starts over from it
+tk = load("scripts/tiktok.ax", tk_set)
+tick(tk)
+r = http.answer('{"access_token":"act.9","expires_in":86400,"refresh_token":"rft.9"}', 200)
+check("new seed replaces the stored chain", r["body"], "client_key=ck&client_secret=cs&grant_type=refresh_token&refresh_token=rft.new")
+http.answer('{"data":{"user":{"follower_count":1260}}}', 200)
+
+var tk0 = load("scripts/tiktok.ax", {"client_key": "ck", "client_secret": "cs", "refresh_token": "", "icon": "tiktok", "step": 500, "interval_min": 30, "source": "auto"})
+tick(tk0)
+check("tiktok: no login, no request", size(http.queue), 0)
+
 # --- LinkedIn: from the settings, gray after stale_days without change ---
 var li = load("scripts/linkedin.ax", {"followers": 7500, "icon": "32288", "step": 500, "stale_days": 30})
 tick(li)

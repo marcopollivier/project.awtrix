@@ -20,6 +20,7 @@ func TestScriptsMatchSettings(t *testing.T) {
 	}
 	cfg := config.Default()
 	cfg.Sources.GitHub.Token, cfg.Sources.YouTube.APIKey, cfg.Sources.Instagram.Token = "x", "x", "x"
+	cfg.Sources.TikTok.ClientKey, cfg.Sources.TikTok.ClientSecret = "x", "x"
 	n := int64(1)
 	settings := Settings(cfg, &n)
 	keyRe := regexp.MustCompile(`(?m)^# @config\s+(\S+)`)

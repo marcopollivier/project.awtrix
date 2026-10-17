@@ -1,6 +1,6 @@
 {
   "_doc": "Shared vectors: the Go hub (internal/render, internal/milestones, internal/sources) and the Berry scripts (scripts/counter.ax) must give the same answers. Read by internal/*/parity_test.go and scripts/test/scripts_test.be.",
-  "keys": ["github_followers", "github_stars", "instagram_followers", "linkedin_followers", "youtube_subs"],
+  "keys": ["github_followers", "github_stars", "instagram_followers", "linkedin_followers", "tiktok_followers", "youtube_subs"],
   "count": [
     [0, "0"], [793, "793"], [4521, "4521"], [9999, "9999"], [10000, "10K"],
     [12345, "12.3K"], [12978, "13K"], [99949, "99.9K"], [99999, "100K"],

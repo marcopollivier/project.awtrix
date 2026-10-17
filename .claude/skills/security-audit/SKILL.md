@@ -9,7 +9,7 @@ O repositório é **público**. O risco principal é um segredo sair do `.env`, 
 
 ## Regras invioláveis
 
-- **Nunca leia `.env`** nem `~/.awtrix-hub/instagram_token.json`. Para saber quais segredos existem, use `.env.example` e `internal/config/config.go`.
+- **Nunca leia `.env`** nem `~/.awtrix-hub/instagram_token.json`, `tiktok_token.json` ou `tiktok_login_state`. Para saber quais segredos existem, use `.env.example` e `internal/config/config.go`.
 - **Nunca imprima o valor de um segredo**, nem parcial. Ferramentas rodam com `--redact`. Um achado diz *onde* está e *qual* segredo é, nunca o valor.
 - Não chame `GET /api/v1/apps/instagram/data` nem `GET /api/v1/logs` no relógio real só para "conferir": as duas respostas podem conter o token. A análise é feita no código.
 - Esta skill **relata**, não corrige. Proponha a correção em cada achado. Só altere código se o usuário pedir.
@@ -25,11 +25,12 @@ O repositório é **público**. O risco principal é um segredo sair do `.env`, 
 make secrets 2>/dev/null || go run github.com/zricethezav/gitleaks/v8@v8.30.1 detect --redact --no-banner --source .
 go run github.com/zricethezav/gitleaks/v8@v8.30.1 detect --redact --no-banner --no-git --source .   # arquivos não commitados
 go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+make lint                                                                                          # golangci-lint na versão do CI, com gosec
 git ls-files | grep -E '(^|/)\.env$|config\.yaml$|state\.json$|instagram_token\.json$'                # não pode imprimir nada
 git check-ignore -q .env && git check-ignore -q config.yaml && echo "ok: .env e config.yaml ignorados"
 ```
 
-O gitleaks com `.gitleaks.toml` na raiz usa as regras do projeto. Sem ele, valem as regras padrão. No `govulncheck`, separe o que o código **chama** (achado real) do que só está no grafo de dependências (informativo). Vulnerabilidade da biblioteca padrão se resolve subindo a versão do Go no `go.mod`.
+O gitleaks com `.gitleaks.toml` na raiz usa as regras do projeto. Sem ele, valem as regras padrão. Um achado do `gosec` no `make lint` (ex.: G117, segredo serializado; G101, credencial no código) é achado desta auditoria: o hook e o CI barram o push. Persistir um segredo de propósito exige um tipo próprio só com o necessário, arquivo `0o600` e `//nolint:gosec // <motivo>` na linha. Tipos que carregam segredo em memória não serializam (`json:"-"`) e se mascaram em `fmt`/`slog` (`String`, `GoString`, `LogValue`), como `tiktok.Token`. No `govulncheck`, separe o que o código **chama** (achado real) do que só está no grafo de dependências (informativo). Vulnerabilidade da biblioteca padrão se resolve subindo a versão do Go no `go.mod`.
 
 ## 2. Mapa dos segredos (siga cada um)
 
@@ -38,6 +39,7 @@ O gitleaks com `.gitleaks.toml` na raiz usa as regras do projeto. Sem ele, valem
 | `GITHUB_TOKEN` | `config.Load` → `Sources.GitHub.Token` | `deploy.Settings` (`secret(...)` em `github` e `github_stars`) | header `Authorization: Bearer` em `sources/github.(*Source).get`; `@config token` de `scripts/github.ax` e `scripts/github_stars.ax` (header no `http.post` do GraphQL) |
 | `YOUTUBE_API_KEY` | `Sources.YouTube.APIKey` | `deploy.Settings` → `api_key` | **query string** `key=` em `sources/youtube.(*Source).get` e em `scripts/youtube.ax` |
 | `INSTAGRAM_TOKEN` | `Sources.Instagram.Token` (só semente) | `instagram.(*Source).token` → `~/.awtrix-hub/instagram_token.json`; `deploy.Settings` → `token` | **query string** `access_token=` em `Fetch` e no refresh; no relógio, `store` chave `tok` em `scripts/instagram.ax`, visível em `GET /api/v1/apps/instagram/data` |
+| `TIKTOK_CLIENT_KEY`/`TIKTOK_CLIENT_SECRET` e refresh token | `Sources.TikTok.ClientKey/ClientSecret`; o refresh token vem de `awtrix-hub tiktok login` (nunca do `.env`) | `deploy.Settings` → `client_key`/`client_secret` (nunca `refresh_token`); `tiktok.(*Source)` guarda o access token só em memória e o refresh token em `~/.awtrix-hub/tiktok_token.json` (`0o600`); `tiktok_login_state` (`0o600`) | corpo do POST `/v2/oauth/token/` e header `Authorization: Bearer` em `sources/tiktok` e `scripts/tiktok.ax`; no relógio, `@config` + store `tok` (`rt`/`at`), visíveis pela API do relógio |
 | `AWTRIX_USER`/`AWTRIX_PASS` | `Device.User/Pass` | `awtrix.(*Client).WithAuth` | HTTP Basic em `(*Client).do`, em texto claro na LAN (o relógio só fala HTTP) |
 
 Para cada linha, confira:
