@@ -1,0 +1,95 @@
+# @name     TikTok
+# @desc     Seguidores pela API oficial (app em developers.tiktok.com), com renovação diária do token
+# @author   marcopollivier
+# @version  1.0
+# @requires counter
+# @config   client_key    text   "Client key"            default="" maxlen=64
+# @config   client_secret text   "Client secret"         default="" maxlen=128
+# @config   refresh_token text   "Refresh token"         default="" maxlen=256 help="awtrix-hub tiktok login preenche; o app renova sozinho"
+# @config   icon          text   "Ícone"                 default="tiktok"
+# @config   step          number "Meta a cada"           default=500 min=0 max=1000000 help="0 desliga a barra e a comemoração"
+# @config   interval_min  number "Atualizar a cada"      default=30 min=1 max=1440 unit=min
+# @config   source        select "Fonte"                 options=auto,direct,hub default=auto help="auto: hub se estiver no ar, senão direto"
+import counter
+var Base = counter.Counter
+
+var API = "https://open.tiktokapis.com/v2/"
+
+# Access tokens last 24h; refresh tokens last a year and may change on every
+# refresh, so the current pair lives in the store ("tok") and the refresh token
+# in the settings only seeds it. Typing (or logging in with) a different one
+# there starts over from it, like the hub.
+class TikTok : Base
+  def init()
+    super(self).init(store, counter.cfg, "tiktok_followers", "TIKTOK")
+  end
+
+  def direct(done)
+    var seed = self.st.get("refresh_token")
+    if seed == nil || seed == "" || self.st.get("client_key", "") == ""
+      done(nil)
+      return
+    end
+    var now = self.now()
+    var t = self.st.get("tok")
+    if t == nil || t.find("seed") != seed
+      t = {"seed": seed, "rt": seed, "at": "", "exp": 0}
+      self.st.set("tok", t)
+    end
+    # Without a clock (now 0) the expiry is unknown: keep the token until a 401.
+    if t["at"] == "" || (now > 0 && t["exp"] - now < 3600)
+      self.refresh(t, done)
+    else
+      self.followers(t, true, done)
+    end
+  end
+
+  def refresh(t, done)
+    var body = "client_key=" + self.st.get("client_key") + "&client_secret=" + self.st.get("client_secret") +
+               "&grant_type=refresh_token&refresh_token=" + t["rt"]
+    http.post(API + "oauth/token/", body, def (b, s)
+      var at = (b != nil && s == 200) ? re.search("\"access_token\": *\"([^\"]+)\"", b) : nil
+      if at == nil
+        # TikTok may answer an expired refresh token with 200 + "error".
+        var bad = s == 400 || s == 401 || (b != nil && re.search("invalid_grant", b) != nil)
+        if bad self.alert() end
+        done(nil, bad ? 401 : s)
+        return
+      end
+      var rt = re.search("\"refresh_token\": *\"([^\"]+)\"", b)
+      var ex = re.search("\"expires_in\": *(\\d+)", b)
+      var now = self.now()
+      t["at"] = at[1]
+      if rt != nil t["rt"] = rt[1] end   # a new one replaces the old for good
+      t["exp"] = now > 0 ? now + (ex != nil ? int(ex[1]) : 86400) : 0
+      self.st.set("tok", t)
+      log("tiktok: token renovado")
+      self.followers(t, false, done)
+    end, {"headers": {"Content-Type": "application/x-www-form-urlencoded"}})   # < 1 KB, read whole
+  end
+
+  # retry: a 401 with a cached access token refreshes once and asks again.
+  def followers(t, retry, done)
+    http.get(API + "user/info/?fields=follower_count", def (b, s)
+      if s == 401 && retry
+        t["at"] = ""
+        self.st.set("tok", t)
+        self.refresh(t, done)
+        return
+      end
+      var mm = (b != nil && s == 200) ? re.search("\"follower_count\": *(\\d+)", b) : nil
+      done(mm != nil ? int(mm[1]) : nil, s)
+    end, {"headers": {"Authorization": "Bearer " + t["at"]}, "find": "\"follower_count\"", "keep": 48})
+  end
+
+  # Invalid refresh token: warn on the clock at most once a day.
+  def alert()
+    var now = self.now()
+    if now > 0 && now - self.st.get("alerted", 0) > 86400
+      self.st.set("alerted", now)
+      notify({"text": "TOKEN TIKTOK INVALIDO", "icon": self.icon, "textColor": 0xFF3333})
+    end
+  end
+end
+
+return TikTok()

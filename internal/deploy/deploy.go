@@ -112,6 +112,11 @@ func Settings(cfg *config.Config, linkedinFollowers *int64) map[string]Setting {
 			"interval_min": mins(sc.Instagram.Interval), "step": sc.Instagram.Milestones.Step,
 		}, "token", sc.Instagram.Token)},
 		"linkedin": {Enabled: sc.LinkedIn.Enabled, Values: linkedin},
+		// refresh_token is never sent: `awtrix-hub tiktok login` writes it to
+		// the clock, which then rotates it; a copy here would go stale.
+		"tiktok": {Enabled: sc.TikTok.Enabled, Values: secret(secret(map[string]any{
+			"icon": cfg.Icon("tiktok"), "interval_min": mins(sc.TikTok.Interval), "step": sc.TikTok.Milestones.Step,
+		}, "client_key", sc.TikTok.ClientKey), "client_secret", sc.TikTok.ClientSecret)},
 	}
 }
 

@@ -6,7 +6,7 @@
 
 <img src="docs/img/rotacao.gif" alt="O relógio mostrando GitHub, Instagram, LinkedIn e YouTube em rotação" width="560">
 
-Seguidores do **GitHub**, **YouTube**, **Instagram** e **LinkedIn** num Ulanzi TC001, com variação do dia, barra até a próxima meta e festa quando a meta é batida.<br>
+Seguidores do **GitHub**, **YouTube**, **Instagram**, **TikTok** e **LinkedIn** num Ulanzi TC001, com variação do dia, barra até a próxima meta e festa quando a meta é batida.<br>
 O relógio busca tudo **sozinho, pelo Wi-Fi**: não precisa de computador ligado.
 
 </div>
@@ -31,7 +31,7 @@ flowchart LR
     subgraph relogio["Relógio (AWTRIX NG)"]
         scripts["scripts/*.ax<br/>um app por rede"]
     end
-    apis["APIs<br/>GitHub · YouTube · Instagram"]
+    apis["APIs<br/>GitHub · YouTube · Instagram · TikTok"]
     subgraph mac["Seu computador (opcional)"]
         hub["awtrix-hub"]
         sim["simulador<br/>localhost:7070"]
@@ -133,6 +133,7 @@ Pronto: pode desligar o computador. Para mudar algo, edite a config e rode `depl
 | GitHub ⭐ | soma das estrelas dos seus repositórios (sem forks) | `GITHUB_TOKEN` |
 | YouTube | inscritos (a API arredonda para 3 dígitos: `12.3K`) | `YOUTUBE_API_KEY` |
 | Instagram | seguidores de conta profissional | `INSTAGRAM_TOKEN` |
+| TikTok | seguidores | `TIKTOK_CLIENT_KEY`/`SECRET` + `./bin/awtrix-hub tiktok login` |
 | LinkedIn | seguidores, digitados por você (não há API para perfil pessoal) | `./bin/awtrix-hub set linkedin 7430` |
 
 O relógio não confere o certificado HTTPS das APIs, e quem estiver na sua rede consegue ler as chaves pela API do relógio. **Use chaves só de leitura** e, se quiser, ligue a senha da interface (*System → authEnabled*) e coloque `AWTRIX_USER`/`AWTRIX_PASS` no `.env`.
@@ -172,6 +173,22 @@ Usa a **API do Instagram com login do Instagram** (`graph.instagram.com`), que n
 5. Clique em *Generate token*, copie o token de longa duração e coloque no `.env`: `INSTAGRAM_TOKEN=...`
 
 O token vale 60 dias, mas o script do relógio o **renova sozinho toda semana**. Se ele ficar inválido, o relógio avisa `TOKEN INSTAGRAM INVALIDO` uma vez por dia.
+
+</details>
+
+<details>
+<summary><b>App do TikTok</b></summary>
+
+Usa a **Display API** oficial (`open.tiktokapis.com`, escopo `user.info.stats`). O app fica em modo *sandbox*, que dispensa a revisão do TikTok para até 10 contas.
+
+1. Em [developers.tiktok.com](https://developers.tiktok.com) → *Manage apps* → *Connect an app*.
+2. Adicione o produto **Login Kit** (Web) e os escopos `user.info.basic` e `user.info.stats`.
+3. Cadastre um *Redirect URI* `https://...` qualquer, por exemplo uma página sua no GitHub Pages. Ela não precisa funcionar: você só vai copiar o endereço da barra do navegador. Coloque o mesmo em `sources.tiktok.redirect_uri` no `config.yaml`.
+4. Crie um **Sandbox** e adicione a sua conta em *Target users*. Pode levar até uma hora para valer.
+5. Coloque no `.env`: `TIKTOK_CLIENT_KEY=...` e `TIKTOK_CLIENT_SECRET=...`, e ligue `sources.tiktok.enabled`.
+6. `./bin/awtrix-hub deploy --only counter,tiktok` e depois `./bin/awtrix-hub tiktok login`: abra o link, autorize e cole o endereço para onde o TikTok te mandou. Fora de um terminal interativo, o comando só mostra o link; o segundo passo é `./bin/awtrix-hub tiktok login --url '<endereço>'`.
+
+O login manda o token direto para o relógio, que o **renova sozinho todo dia** (o acesso vale 24h, a renovação, um ano). O TikTok pode trocar o refresh token a cada renovação, então relógio e hub não dividem token: para o hub também mostrar o TikTok, rode `tiktok login --hub`, que é uma autorização separada. Se o token ficar inválido, o relógio avisa `TOKEN TIKTOK INVALIDO` uma vez por dia; rode o login de novo.
 
 </details>
 
@@ -246,6 +263,7 @@ tail -f ~/Library/Logs/awtrix-hub.log
 |---|---|
 | `./bin/awtrix-hub deploy` | instala ícones, scripts e configurações no relógio (`--only github,youtube` para alguns) |
 | `./bin/awtrix-hub set linkedin 7430` | atualiza o LinkedIn no relógio na hora |
+| `./bin/awtrix-hub tiktok login [--hub]` | autoriza a conta do TikTok no relógio (ou no hub) |
 | `./bin/awtrix-hub icons` | só envia os ícones |
 | `./bin/awtrix-hub run [--sim]` | roda o hub (com `--sim`, sobe o simulador junto) |
 | `./bin/awtrix-hub run --only github --debug` | uma fonte só, com logs detalhados |

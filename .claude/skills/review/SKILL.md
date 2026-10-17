@@ -85,7 +85,7 @@ Se o diff mexe num lado de um desses pares:
 - O outro lado mudou junto, ou a PR explica por que não. "Só faz sentido no
   relógio" é uma justificativa válida, mas precisa estar escrita.
 - As chaves de métrica continuam iguais nos dois runtimes: `github_followers`,
-  `github_stars`, `youtube_subs`, `instagram_followers`, `linkedin_followers`
+  `github_stars`, `youtube_subs`, `instagram_followers`, `linkedin_followers`, `tiktok_followers`
   (`Key:` em `internal/sources/*/`, `super(self).init(store, counter.cfg, "<chave>"` nos `.ax`).
 - Se existir a skill `parity` (`.claude/skills/parity/SKILL.md`), siga o roteiro
   dela para essa parte. Se não existir, faça a comparação acima à mão.

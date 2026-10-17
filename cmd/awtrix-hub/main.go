@@ -7,10 +7,13 @@
 //	awtrix-hub preview                 # fetch every source once and exit
 //	awtrix-hub set linkedin 2890       # manual counters (also updates the clock's script)
 //	awtrix-hub deploy                  # install scripts/*.ax on the clock (runs without the hub)
+//	awtrix-hub tiktok login [--hub]    # authorize TikTok for the clock (or the hub)
 package main
 
 import (
+	"bufio"
 	"context"
+	"crypto/rand"
 	"errors"
 	"flag"
 	"fmt"
@@ -40,6 +43,7 @@ import (
 	"github.com/marcopollivier/project.awtrix/internal/sources/github"
 	"github.com/marcopollivier/project.awtrix/internal/sources/instagram"
 	"github.com/marcopollivier/project.awtrix/internal/sources/linkedin"
+	"github.com/marcopollivier/project.awtrix/internal/sources/tiktok"
 	"github.com/marcopollivier/project.awtrix/internal/sources/youtube"
 	"github.com/marcopollivier/project.awtrix/internal/state"
 )
@@ -55,6 +59,7 @@ comandos:
   set       grava um contador manual (ex.: set linkedin 2890) e atualiza o relógio
   icons     envia os ícones da config para o relógio (o AWTRIX não baixa sozinho)
   deploy    instala os scripts no relógio (AWTRIX NG), que passa a funcionar sem o hub
+  tiktok    tiktok login [--hub]: autoriza a conta do TikTok no relógio (ou no hub)
   version   mostra a versão
 `
 
@@ -80,6 +85,8 @@ func main() {
 		err = cmdIcons(ctx, args)
 	case "deploy":
 		err = cmdDeploy(ctx, args)
+	case "tiktok":
+		err = cmdTikTok(ctx, args)
 	case "version":
 		fmt.Println(version)
 	default:
@@ -166,7 +173,7 @@ func cmdRun(ctx context.Context, args []string, once bool) error {
 	cfgPath := fl.String("config", "config.yaml", "arquivo de configuração")
 	withSim := fl.Bool("sim", false, "sobe o simulador junto e envia para ele também")
 	fixture := fl.String("football-fixture", "", "diretório com um jogo gravado (ex.: internal/sources/football/testdata/match)")
-	only := fl.String("only", "", "roda só esta fonte (github, youtube, instagram, linkedin, football)")
+	only := fl.String("only", "", "roda só esta fonte (github, youtube, instagram, linkedin, tiktok, football)")
 	debug := fl.Bool("debug", false, "logs detalhados")
 	useMock := fl.Bool("mock", false, "dados de mentira para todas as fontes (implica --sim; não toca no estado real)")
 	fl.Parse(args)
@@ -279,6 +286,10 @@ func setupMock(ctx context.Context, cfg *config.Config) (string, error) {
 	sc.Instagram.Enabled, sc.Instagram.Interval = true, 5*time.Second
 	sc.Instagram.Token = "mock"
 	sc.LinkedIn.Enabled = true
+	sc.TikTok.Enabled, sc.TikTok.Interval = true, 5*time.Second
+	if err := tiktok.WriteToken(tiktokPath(cfg), tiktok.Token{Refresh: "mock"}); err != nil {
+		return "", err
+	}
 	sc.Football.Enabled = true
 	return srv.URL, nil
 }
@@ -323,6 +334,17 @@ func buildSources(cfg *config.Config, st *state.Store, fixture, only, mockURL st
 	}
 	if enabled("linkedin", sc.LinkedIn.Enabled) {
 		srcs = append(srcs, linkedin.New(sc.LinkedIn, cfg.Icon, manualPath(cfg)))
+	}
+	if enabled("tiktok", sc.TikTok.Enabled) {
+		if _, err := tiktok.ReadToken(tiktokPath(cfg)); err != nil && mockURL == "" {
+			log.Warn("tiktok habilitado mas o hub não tem token; rode awtrix-hub tiktok login --hub. Pulando")
+		} else {
+			tt := tiktok.New(sc.TikTok, cfg.Icon, tiktokPath(cfg))
+			if mockURL != "" {
+				tt.BaseURL = mockURL + "/tiktok"
+			}
+			srcs = append(srcs, tt)
+		}
 	}
 	if enabled("football", sc.Football.Enabled) || fixture != "" {
 		f := football.New(sc.Football, cfg.Icon, st, cfg.Location)
@@ -481,3 +503,95 @@ func syncIcons(ctx context.Context, cfg *config.Config, client *awtrix.Client, l
 }
 
 func manualPath(cfg *config.Config) string { return filepath.Join(cfg.DataDir, "manual.json") }
+
+func tiktokPath(cfg *config.Config) string { return filepath.Join(cfg.DataDir, "tiktok_token.json") }
+
+// cmdTikTok runs the OAuth login once per runtime. The clock and the hub each
+// get their own token: TikTok may rotate the refresh token on every refresh,
+// so a shared one would break whichever runtime did not refresh it.
+func cmdTikTok(ctx context.Context, args []string) error {
+	if len(args) == 0 || args[0] != "login" {
+		return errors.New("uso: awtrix-hub tiktok login [--hub]")
+	}
+	fl := flag.NewFlagSet("tiktok login", flag.ExitOnError)
+	cfgPath := fl.String("config", "config.yaml", "arquivo de configuração")
+	hub := fl.Bool("hub", false, "guarda o token no hub em vez de mandar para o relógio")
+	back := fl.String("url", "", "endereço para onde o TikTok voltou (2º passo, sem terminal interativo)")
+	fl.Parse(args[1:])
+	cfg, err := loadConfig(*cfgPath, newLogger(false))
+	if err != nil {
+		return err
+	}
+	tc := cfg.Sources.TikTok
+	if tc.ClientKey == "" || tc.ClientSecret == "" {
+		return errors.New("defina TIKTOK_CLIENT_KEY e TIKTOK_CLIENT_SECRET no .env")
+	}
+	if !strings.HasPrefix(tc.RedirectURI, "https://") {
+		return errors.New("defina sources.tiktok.redirect_uri (https, o mesmo cadastrado no app do TikTok)")
+	}
+	if !*hub && cfg.Device.URL == "" {
+		return errors.New("defina device.url na config, ou use --hub")
+	}
+	// The state is saved so the second step can run as a separate command
+	// (--url) when stdin is not a terminal.
+	statePath := filepath.Join(cfg.DataDir, "tiktok_login_state")
+	var state, line string
+	if *back == "" {
+		state = rand.Text()
+		if err := os.MkdirAll(cfg.DataDir, 0o700); err != nil {
+			return err
+		}
+		if err := os.WriteFile(statePath, []byte(state), 0o600); err != nil {
+			return err
+		}
+		fmt.Println("1. Abra no navegador e autorize a conta:")
+		fmt.Println("\n   " + tiktok.AuthURL(tc.ClientKey, tc.RedirectURI, state) + "\n")
+		fmt.Println("2. O TikTok volta para " + tc.RedirectURI + " (a página pode até dar erro).")
+		if fi, err := os.Stdin.Stat(); err != nil || fi.Mode()&os.ModeCharDevice == 0 {
+			fmt.Println("   Depois rode: awtrix-hub tiktok login --url '<endereço da barra do navegador>'")
+			return nil
+		}
+		fmt.Print("   Cole aqui o endereço completo da barra do navegador: ")
+		var err error
+		if line, err = bufio.NewReader(os.Stdin).ReadString('\n'); err != nil && line == "" {
+			// Some terminals (e.g. a command run from an editor) close stdin.
+			fmt.Println("\n   Sem entrada aqui. Depois de autorizar, rode: awtrix-hub tiktok login --url '<endereço>'")
+			return nil
+		}
+	} else {
+		b, err := os.ReadFile(statePath)
+		if err != nil {
+			return errors.New("nenhum login em andamento; rode antes: awtrix-hub tiktok login")
+		}
+		state, line = string(b), *back
+	}
+	code, err := tiktok.CodeFrom(line, state)
+	if err != nil {
+		return err
+	}
+	os.Remove(statePath) // a code is single-use; the next login starts over
+	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
+	defer cancel()
+	tok, err := tiktok.Exchange(ctx, "https://open.tiktokapis.com", tc, code, time.Now())
+	if err != nil {
+		return fmt.Errorf("troca do código falhou: %w", err)
+	}
+	if *hub {
+		if err := tiktok.WriteToken(tiktokPath(cfg), tok); err != nil {
+			return err
+		}
+		fmt.Println("pronto: token do hub em", tiktokPath(cfg))
+		return nil
+	}
+	// The clock gets the app credentials too, so login alone is enough after
+	// the script is installed. Saving the config restarts the app with it.
+	client := awtrix.NewClient(nil, newLogger(false)).WithAuth(cfg.Device.User, cfg.Device.Pass)
+	err = client.PatchAppConfig(ctx, cfg.Device.URL, "tiktok", map[string]any{
+		"client_key": tc.ClientKey, "client_secret": tc.ClientSecret, "refresh_token": tok.Refresh,
+	})
+	if err != nil {
+		return fmt.Errorf("relógio (%s) não atualizado (o script está instalado? awtrix-hub deploy --only counter,tiktok): %w", cfg.Device.URL, err)
+	}
+	fmt.Println("pronto: o relógio renova o token sozinho:", cfg.Device.URL)
+	return nil
+}

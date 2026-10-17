@@ -35,6 +35,7 @@ icons:
   youtube: "youtube"              # ícone próprio: 1º quadro fixo do 5952
   instagram: "36659"
   linkedin: "32288"
+  tiktok: "tiktok"                # ícone próprio: icons/tiktok.gif
   football: "26316"
   goal: "8530"
   party: "9554"
@@ -69,6 +70,12 @@ sources:
   linkedin:
     enabled: true                   # valor manual: awtrix-hub set linkedin 2890
     stale_after: 720h               # fica cinza se não for atualizado em 30 dias
+    milestones: { step: 500 }
+
+  tiktok:
+    enabled: false                  # precisa de TIKTOK_CLIENT_KEY/SECRET no .env e de `awtrix-hub tiktok login`
+    interval: 30m
+    redirect_uri: https://exemplo.github.io/tiktok   # https, o mesmo cadastrado no app do TikTok
     milestones: { step: 500 }
 
   football:

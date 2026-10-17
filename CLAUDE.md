@@ -78,6 +78,7 @@ Every key in `deploy.Settings` must exist as a `# @config <key>` line in that sc
 Two rules about which keys are sent:
 - empty secrets are not sent, so a token typed in the clock UI is not wiped;
 - `source` is never sent, because it stays as the user chose it on the clock.
+- TikTok's `refresh_token` is never sent. TikTok may rotate it on every refresh, so the clock and the hub each get their own from `awtrix-hub tiktok login [--hub]`; the clock's copy is written straight to its config, and a shared token would cut off whichever runtime did not refresh it.
 
 ### Scripts (Berry, `scripts/`)
 
@@ -90,7 +91,7 @@ The base handles:
 - milestones and the party notification;
 - graying out stale values.
 
-Keys used by both runtimes must match: `github_followers`, `github_stars`, `youtube_subs`, `instagram_followers`, `linkedin_followers`.
+Keys used by both runtimes must match: `github_followers`, `github_stars`, `youtube_subs`, `instagram_followers`, `linkedin_followers`, `tiktok_followers`.
 
 `testdata/parity.json` holds vectors both sides test (keys, formatting, delta, bar, parties): `internal/*/parity_test.go` in Go, `scripts_test.be` in Berry. A change to shared behavior updates the vectors, so both test suites fail until both sides follow. The `parity` skill (`.claude/skills/parity`) maps each Go file to its Berry twin and lists the known divergences.
 

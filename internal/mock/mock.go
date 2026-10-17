@@ -1,4 +1,4 @@
-// Package mock fakes the GitHub, YouTube and Instagram APIs with counters that
+// Package mock fakes the GitHub, YouTube, Instagram and TikTok APIs with counters that
 // grow on every request, so `run --mock` shows deltas, progress bars and
 // milestone celebrations within a minute, without credentials.
 package mock
@@ -25,7 +25,7 @@ func (c *counter) next() int64 {
 	return c.value
 }
 
-// Server serves the fake APIs under /github, /youtube and /instagram.
+// Server serves the fake APIs under /github, /youtube, /instagram and /tiktok.
 func Server() *httptest.Server {
 	var (
 		followers = &counter{value: 796, step: 1}    // -> 800
@@ -33,6 +33,7 @@ func Server() *httptest.Server {
 		subs      = &counter{value: 12_960, step: 9} // -> 13K
 		views     = &counter{value: 1_200, step: 37}
 		insta     = &counter{value: 4_471, step: 4} // -> 4500
+		tt        = &counter{value: 1_985, step: 3} // -> 2000
 	)
 	published := time.Now().Add(-3 * time.Hour).UTC().Format(time.RFC3339)
 
@@ -54,6 +55,12 @@ func Server() *httptest.Server {
 	})
 	mux.HandleFunc("GET /instagram/{ver}/me", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, `{"followers_count":%d}`, insta.next())
+	})
+	mux.HandleFunc("POST /tiktok/v2/oauth/token/", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, `{"access_token":"act.mock","expires_in":86400,"refresh_token":"rft.mock","token_type":"Bearer"}`)
+	})
+	mux.HandleFunc("GET /tiktok/v2/user/info/", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintf(w, `{"data":{"user":{"follower_count":%d}},"error":{"code":"ok"}}`, tt.next())
 	})
 	return httptest.NewServer(mux)
 }
