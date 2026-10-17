@@ -12,8 +12,9 @@ test:
 vet:
 	go vet ./...
 
-# gofmt + vet + golangci-lint v2 (the same checks as the Go CI)
-GOLANGCI_LINT ?= golangci-lint
+# gofmt + vet + golangci-lint v2 (the same checks and version as the Go CI)
+GOLANGCI_VERSION := $(shell sed -n 's/^ *version: *\(v[0-9.]*\).*/\1/p' .github/workflows/go.yml | head -1)
+GOLANGCI_LINT ?= go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_VERSION)
 lint: vet
 	@out=$$(gofmt -l .); [ -z "$$out" ] || { echo "Arquivos sem gofmt:"; echo "$$out"; exit 1; }
 	$(GOLANGCI_LINT) run ./...

@@ -4,8 +4,11 @@
 // Access tokens last 24h and refresh tokens a year, but a refresh may hand back
 // a new refresh token that replaces the old one. So the hub and the clock each
 // log in on their own (`awtrix-hub tiktok login [--hub]`) and never share a
-// token: whichever refreshed first would cut the other off. The hub keeps its
-// pair in tokenPath.
+// token: whichever refreshed first would cut the other off.
+//
+// Only the refresh token is written to disk (tokenPath, 0600); the access token
+// lives in memory, so a restart costs one extra refresh. Token never marshals
+// or prints its values, so it cannot leak through a log line by accident.
 package tiktok
 
 import (
@@ -14,6 +17,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
@@ -36,10 +40,23 @@ const (
 // ErrInvalid means the refresh token was rejected: only a new login fixes it.
 var ErrInvalid = errors.New("tiktok: refresh token invalid or expired")
 
+// Token is an in-memory token pair. Its fields are hidden from encoding/json,
+// fmt and slog; only WriteToken persists the refresh token, on purpose.
 type Token struct {
-	Access    string    `json:"access_token"`
-	Refresh   string    `json:"refresh_token"`
-	ExpiresAt time.Time `json:"expires_at"`
+	Access    string    `json:"-"`
+	Refresh   string    `json:"-"`
+	ExpiresAt time.Time `json:"-"`
+}
+
+func (t Token) String() string {
+	return "tiktok.Token{redacted, expires " + t.ExpiresAt.Format(time.RFC3339) + "}"
+}
+func (t Token) GoString() string     { return t.String() }
+func (t Token) LogValue() slog.Value { return slog.StringValue(t.String()) }
+
+// tokenFile is the on-disk form: the refresh token alone.
+type tokenFile struct {
+	Refresh string `json:"refresh_token"`
 }
 
 type Source struct {
@@ -48,6 +65,7 @@ type Source struct {
 	tokenPath string
 	BaseURL   string // https://open.tiktokapis.com
 	alertedAt time.Time
+	tok       Token // current pair; Access is never written to disk
 }
 
 func New(cfg config.TikTok, icons func(string) string, tokenPath string) *Source {
@@ -58,11 +76,15 @@ func (s *Source) Name() string                 { return "tiktok" }
 func (s *Source) Next(time.Time) time.Duration { return s.cfg.Interval }
 
 func (s *Source) Fetch(ctx context.Context, now time.Time) (sources.Output, error) {
-	tok, err := ReadToken(s.tokenPath)
+	rt, err := ReadToken(s.tokenPath)
 	if err != nil {
 		return sources.Output{}, fmt.Errorf("no TikTok token (awtrix-hub tiktok login --hub): %w", err)
 	}
-	n, err := s.followers(ctx, &tok, now)
+	if rt != s.tok.Refresh {
+		// First fetch, or a new `tiktok login --hub` replaced the file.
+		s.tok = Token{Refresh: rt}
+	}
+	n, err := s.followers(ctx, &s.tok, now)
 	if errors.Is(err, ErrInvalid) {
 		// Warn on the clock at most once a day.
 		if now.Sub(s.alertedAt) > 24*time.Hour {
@@ -127,7 +149,7 @@ func (s *Source) refresh(ctx context.Context, tok *Token, now time.Time) error {
 	*tok = t
 	// Best effort: if it is not written, the next fetch refreshes again from
 	// the old refresh token, which works until TikTok rotates it.
-	_ = WriteToken(s.tokenPath, t)
+	_ = WriteToken(s.tokenPath, t.Refresh)
 	return nil
 }
 
@@ -206,23 +228,29 @@ func tokenRequest(ctx context.Context, baseURL string, form url.Values, now time
 	return Token{Access: r.AccessToken, Refresh: r.RefreshToken, ExpiresAt: now.Add(time.Duration(r.ExpiresIn) * time.Second)}, nil
 }
 
-func ReadToken(path string) (Token, error) {
-	var t Token
+// ReadToken returns the refresh token saved by WriteToken.
+func ReadToken(path string) (string, error) {
 	b, err := os.ReadFile(path)
 	if err != nil {
-		return t, err
+		return "", err
 	}
-	if err := json.Unmarshal(b, &t); err != nil {
-		return t, err
+	var f tokenFile
+	if err := json.Unmarshal(b, &f); err != nil {
+		return "", err
 	}
-	if t.Refresh == "" {
-		return t, errors.New("empty refresh token")
+	if f.Refresh == "" {
+		return "", errors.New("empty refresh token")
 	}
-	return t, nil
+	return f.Refresh, nil
 }
 
-func WriteToken(path string, t Token) error {
-	b, _ := json.MarshalIndent(t, "", "  ")
+// WriteToken saves the refresh token, owner-only. Persisting it is the point:
+// without it the hub would need a new login after every restart.
+func WriteToken(path, refresh string) error {
+	b, err := json.Marshal(tokenFile{Refresh: refresh}) //nolint:gosec // G117: storing the refresh token is intended; 0600 file in a 0700 dir
+	if err != nil {
+		return err
+	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return err
 	}

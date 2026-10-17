@@ -110,7 +110,7 @@ Vale para diff que toca token, HTTP, config, log, `internal/api`, `internal/sim`
 
 ## 3. Rodar o que for barato
 
-Se houver Go no diff: `go vet ./...` e `go test ./...`. Se houver Berry e um
+Se houver Go no diff: `make lint` (gofmt, vet e golangci-lint com gosec, na versão do CI) e `go test ./...`. Leia a saída inteira, sem `tail`: um achado do lint barra o push. Se houver Berry e um
 interpretador (`berry` no PATH ou `$BERRY`): `make test-scripts BERRY=...`. Se
 não houver Berry, diga isso no relatório em vez de supor que passa. Falha de
 teste é achado bloqueante, com a saída relevante.

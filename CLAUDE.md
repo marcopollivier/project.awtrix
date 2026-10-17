@@ -17,6 +17,7 @@ The user writes in Portuguese. User-facing text (CLI messages, logs, README, com
 make build                 # bin/awtrix-hub
 make test                  # go test ./...
 make vet
+make lint                  # gofmt + vet + golangci-lint at the CI's version (gosec flags marshaled secrets)
 go test ./internal/scheduler -run TestCounterDeltaProgressAndMilestone   # one test
 make test-scripts BERRY=/path/to/berry   # Berry scripts against NG stand-ins
 make lint-scripts BERRY=/path/to/berry   # compile every .ax, @config only in the header
@@ -31,7 +32,7 @@ make hooks                 # enable .githooks/pre-push (gitleaks, Go checks, Ber
 
 Berry is not in Homebrew. Build it with `git clone https://github.com/berry-lang/berry && make -C berry`.
 
-The pre-push hook scans the outgoing commits with gitleaks (blocks), runs gofmt/vet/test when Go changed (blocks), and runs the Berry tests when `scripts/` changed (only warns if Berry is missing; CI blocks). Do not bypass it with `--no-verify` unless the user asks.
+The pre-push hook scans the outgoing commits with gitleaks (blocks), runs gofmt/vet/test and golangci-lint (gosec included, same version as CI via `go run`) when Go changed (blocks), and runs the Berry tests when `scripts/` changed (only warns if Berry is missing; CI blocks). Do not bypass it with `--no-verify` unless the user asks.
 
 Config is `config.yaml` (from `config.example.yaml`) and secrets are in `.env`. Both are gitignored. Hub state lives in `~/.awtrix-hub/`.
 

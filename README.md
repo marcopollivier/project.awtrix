@@ -290,7 +290,7 @@ O estado do hub (variação do dia, metas, último placar) fica em `~/.awtrix-hu
 `make hooks` liga o pre-push versionado em `.githooks/`. Antes de cada push ele:
 
 - procura segredos nos commits que vão subir (gitleaks via `go run`, sem instalar nada) e **bloqueia** se achar;
-- se o push mexe em Go: `gofmt`, `go vet` e `go test` (bloqueiam) e `golangci-lint` (só avisa) se estiver instalado;
+- se o push mexe em Go: `gofmt`, `go vet`, `go test` e `golangci-lint` na mesma versão do CI (todos bloqueiam). O `gosec` do lint acusa, por exemplo, um token serializado em JSON;
 - se mexe em `scripts/`: `make test-scripts`. Sem Berry na máquina, só avisa (use `BERRY=/caminho/para/berry`).
 
 Em emergência, `git push --no-verify` pula o hook. O CI no GitHub roda as mesmas verificações e é quem barra de verdade; as skills do Claude em `.claude/skills/` (paridade, segurança, review) ficam para análise sob demanda.

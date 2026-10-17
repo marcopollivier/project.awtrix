@@ -287,7 +287,7 @@ func setupMock(ctx context.Context, cfg *config.Config) (string, error) {
 	sc.Instagram.Token = "mock"
 	sc.LinkedIn.Enabled = true
 	sc.TikTok.Enabled, sc.TikTok.Interval = true, 5*time.Second
-	if err := tiktok.WriteToken(tiktokPath(cfg), tiktok.Token{Refresh: "mock"}); err != nil {
+	if err := tiktok.WriteToken(tiktokPath(cfg), "mock"); err != nil {
 		return "", err
 	}
 	sc.Football.Enabled = true
@@ -577,7 +577,7 @@ func cmdTikTok(ctx context.Context, args []string) error {
 		return fmt.Errorf("troca do código falhou: %w", err)
 	}
 	if *hub {
-		if err := tiktok.WriteToken(tiktokPath(cfg), tok); err != nil {
+		if err := tiktok.WriteToken(tiktokPath(cfg), tok.Refresh); err != nil {
 			return err
 		}
 		fmt.Println("pronto: token do hub em", tiktokPath(cfg))

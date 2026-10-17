@@ -1,13 +1,18 @@
 package tiktok
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -82,38 +87,102 @@ func TestFetchRefreshesAndKeepsRotatedToken(t *testing.T) {
 	srv := httptest.NewServer(f.handler(t))
 	defer srv.Close()
 	path := filepath.Join(t.TempDir(), "tiktok_token.json")
-	WriteToken(path, Token{Refresh: "rft.seed"})
+	WriteToken(path, "rft.seed")
 	now := time.Date(2026, 10, 16, 12, 0, 0, 0, time.UTC)
 
-	out, err := newSource(srv.URL, path).Fetch(context.Background(), now)
+	s := newSource(srv.URL, path)
+	out, err := s.Fetch(context.Background(), now)
 	if err != nil || out.Metrics[0].Value != 1234 || out.Metrics[0].Key != "tiktok_followers" {
 		t.Fatalf("fetch: %+v %v", out, err)
 	}
 	if f.refreshes != 1 {
 		t.Fatalf("no access token: should refresh once, did %d", f.refreshes)
 	}
-	// Within the day, after a restart: the stored access token is reused.
-	if _, err := newSource(srv.URL, path).Fetch(context.Background(), now.Add(12*time.Hour)); err != nil || f.refreshes != 1 {
+	// Within the day: the access token in memory is reused.
+	if _, err := s.Fetch(context.Background(), now.Add(12*time.Hour)); err != nil || f.refreshes != 1 {
 		t.Fatalf("refreshes = %d, %v", f.refreshes, err)
 	}
 	// Near expiry: refreshes with the rotated token, not the seed.
-	if _, err := newSource(srv.URL, path).Fetch(context.Background(), now.Add(23*time.Hour+30*time.Minute)); err != nil || f.refreshes != 2 {
+	if _, err := s.Fetch(context.Background(), now.Add(23*time.Hour+30*time.Minute)); err != nil || f.refreshes != 2 {
 		t.Fatalf("refreshes = %d, %v", f.refreshes, err)
 	}
-	if tok, _ := ReadToken(path); tok.Refresh != "rft.2" {
-		t.Fatalf("rotated refresh token not saved: %q", tok.Refresh)
+	if rt, _ := ReadToken(path); rt != "rft.2" {
+		t.Fatalf("rotated refresh token not saved: %q", rt)
+	}
+	// After a restart the access token is gone (memory only): one refresh,
+	// from the rotated token on disk.
+	if _, err := newSource(srv.URL, path).Fetch(context.Background(), now.Add(24*time.Hour)); err != nil || f.refreshes != 3 {
+		t.Fatalf("refreshes = %d, %v", f.refreshes, err)
+	}
+}
+
+// The access token never reaches the disk, and a Token never shows its
+// values through encoding/json, fmt or slog.
+func TestTokenDoesNotLeak(t *testing.T) {
+	f := &fakeTikTok{refresh: "rft.seed"}
+	srv := httptest.NewServer(f.handler(t))
+	defer srv.Close()
+	path := filepath.Join(t.TempDir(), "t.json")
+	WriteToken(path, "rft.seed")
+	s := newSource(srv.URL, path)
+	if _, err := s.Fetch(context.Background(), time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	disk, _ := os.ReadFile(path)
+	if strings.Contains(string(disk), "act.") {
+		t.Fatalf("access token written to disk: %s", disk)
+	}
+	if fi, _ := os.Stat(path); fi.Mode().Perm() != 0o600 {
+		t.Fatalf("token file mode %v", fi.Mode().Perm())
+	}
+
+	tok := Token{Access: "act.secret", Refresh: "rft.secret", ExpiresAt: time.Now()}
+	j, _ := json.Marshal(tok)
+	var logs bytes.Buffer
+	slog.New(slog.NewJSONHandler(&logs, nil)).Info("x", "tok", tok)
+	slog.New(slog.NewTextHandler(&logs, nil)).Info("x", "tok", tok)
+	for name, out := range map[string]string{
+		"json": string(j), "%v": fmt.Sprintf("%v", tok), "%+v": fmt.Sprintf("%+v", tok),
+		"%#v": fmt.Sprintf("%#v", tok), "slog": logs.String(),
+	} {
+		if strings.Contains(out, "secret") {
+			t.Errorf("%s leaks the token: %s", name, out)
+		}
 	}
 }
 
 func TestRevokedAccessTokenRefreshesOnce(t *testing.T) {
-	f := &fakeTikTok{refresh: "rft.seed", access: "other"}
+	f := &fakeTikTok{refresh: "rft.seed"}
 	srv := httptest.NewServer(f.handler(t))
 	defer srv.Close()
 	path := filepath.Join(t.TempDir(), "t.json")
+	WriteToken(path, "rft.seed")
+	s := newSource(srv.URL, path)
 	now := time.Now()
-	WriteToken(path, Token{Access: "act.old", Refresh: "rft.seed", ExpiresAt: now.Add(20 * time.Hour)})
-	if _, err := newSource(srv.URL, path).Fetch(context.Background(), now); err != nil || f.refreshes != 1 {
+	s.Fetch(context.Background(), now)
+	f.mu.Lock()
+	f.access = "revoked" // the access token in memory stops working
+	f.mu.Unlock()
+	if _, err := s.Fetch(context.Background(), now.Add(time.Hour)); err != nil || f.refreshes != 2 {
 		t.Fatalf("refreshes = %d, %v", f.refreshes, err)
+	}
+}
+
+func TestNewLoginReplacesTokenInMemory(t *testing.T) {
+	f := &fakeTikTok{refresh: "rft.seed"}
+	srv := httptest.NewServer(f.handler(t))
+	defer srv.Close()
+	path := filepath.Join(t.TempDir(), "t.json")
+	WriteToken(path, "rft.seed")
+	s := newSource(srv.URL, path)
+	now := time.Now()
+	s.Fetch(context.Background(), now)
+	f.mu.Lock()
+	f.refresh = "rft.login" // `tiktok login --hub` while the hub runs
+	f.mu.Unlock()
+	WriteToken(path, "rft.login")
+	if _, err := s.Fetch(context.Background(), now.Add(time.Hour)); err != nil || f.refreshes != 2 {
+		t.Fatalf("new file not picked up: refreshes = %d, %v", f.refreshes, err)
 	}
 }
 
@@ -122,7 +191,7 @@ func TestInvalidRefreshTokenAlertsOncePerDay(t *testing.T) {
 		f := &fakeTikTok{refresh: "rft.other", errIn200: in200}
 		srv := httptest.NewServer(f.handler(t))
 		path := filepath.Join(t.TempDir(), "t.json")
-		WriteToken(path, Token{Refresh: "rft.seed"})
+		WriteToken(path, "rft.seed")
 		s := newSource(srv.URL, path)
 		now := time.Now()
 		out, err := s.Fetch(context.Background(), now)

@@ -4,12 +4,15 @@
 # Git feeds one line per ref being pushed on stdin:
 #   <local_ref> <local_sha> <remote_ref> <remote_sha>
 # Only what the push changes is checked: secrets in the outgoing commits always,
-# Go checks when Go files changed, Berry tests when scripts/ changed.
+# Go checks (gofmt, vet, test, golangci-lint) when Go files changed, Berry tests
+# when scripts/ changed.
 # The Go and Berry checks run on the working tree, which is normally the commit
 # being pushed.
 set -uo pipefail
 
 GITLEAKS_VERSION=v8.30.1
+# The Go CI's golangci-lint version, so the hook and CI agree on every finding.
+GOLANGCI_VERSION=$(sed -n 's/^ *version: *\(v[0-9.]*\).*/\1/p' .github/workflows/go.yml | head -1)
 ZERO=0000000000000000000000000000000000000000
 
 cd "$(git rev-parse --show-toplevel)" || exit 1
@@ -60,14 +63,13 @@ if grep -qE '(\.go|^go\.mod|^go\.sum)$' <<<"$changed"; then
   go vet ./... || fail "go vet falhou"
   step "go test"
   go test ./... || fail "go test falhou"
-  # Advisory only: a golangci-lint built with an older Go cannot load this
-  # module's export data and fails for reasons unrelated to the code.
-  if command -v golangci-lint >/dev/null; then
-    step "golangci-lint (só aviso)"
-    golangci-lint run ./... >&2 || warn "golangci-lint apontou problemas (ou está desatualizado para esta versão do Go); o CI verifica."
-  else
-    warn "golangci-lint não encontrado; o CI verifica."
-  fi
+  # Blocks, like CI: gosec catches secrets marshaled or logged by mistake.
+  # Built by `go run` with the local Go, so an installed binary built with an
+  # older Go (which cannot load this module) never gets in the way.
+  [ -n "$GOLANGCI_VERSION" ] || fail "versão do golangci-lint não encontrada em .github/workflows/go.yml"
+  step "golangci-lint $GOLANGCI_VERSION"
+  go run "github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$GOLANGCI_VERSION" run ./... ||
+    fail "golangci-lint apontou problemas. Corrija, ou justifique com //nolint:<linter> // <motivo> quando for intencional."
 fi
 
 # 3. Berry: the scripts against the NG stand-ins. Missing Berry only warns (CI blocks).
