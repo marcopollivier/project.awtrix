@@ -1,0 +1,23 @@
+meta {
+  name: Uma métrica
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{hub_url}}/api/v1/metrics/{{app}}
+  body: none
+  auth: none
+}
+
+docs {
+  O que os scripts consultam (`counter.ax`, `from_hub`). A idade é calculada no hub, então diferença de relógio não importa.
+
+  ```json
+  {"value":3125,"age":60}
+  ```
+
+  Chave desconhecida: `404 {"error":"unknown metric"}`.
+
+  Chaves: `github_followers`, `github_stars`, `youtube_subs`, `instagram_followers`, `linkedin_followers`, `tiktok_followers`. O script trata como velho um valor com `age` acima de 6 h.
+}

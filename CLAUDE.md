@@ -59,6 +59,10 @@ Config is `config.yaml` (from `config.example.yaml`) and secrets are in `.env`. 
 
 The simulator (`internal/sim`) imitates the same routes and the same strictness: it requires `application/json` and rejects unknown fields. Payload changes therefore show up there first. `web/matrix.js` reads the NG field names.
 
+### HTTP contracts (`bruno/`)
+
+A Bruno collection documents every endpoint: `Hub/` (metrics), `Simulador/` (the NG subset in `internal/sim`) and `Relógio/` (the NG routes the hub, deploy and scripts use, with Basic auth). The `Local` environment keeps `clock_url`, `clock_user` and `clock_pass` as secrets, so neither the LAN IP nor the password lands in git. A new or changed route or payload key updates the matching `.bru` file. The example bodies are valid NG payloads: `npx @usebruno/cli run Simulador --env Local` against `make mock` must pass, because the simulator rejects unknown keys.
+
 ### Metrics endpoint
 
 `internal/api` is served by `run` when `api.addr` is set:

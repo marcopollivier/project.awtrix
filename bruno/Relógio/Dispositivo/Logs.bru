@@ -1,0 +1,20 @@
+meta {
+  name: Logs
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{clock_url}}/api/v1/logs?after=0
+  body: none
+  auth: basic
+}
+
+auth:basic {
+  username: {{clock_user}}
+  password: {{clock_pass}}
+}
+
+docs {
+  As últimas ~34 linhas. Cada script registra de onde veio o valor (`tiktok_followers: 3125 (direct)`). Use `after=N` para pedir só as linhas novas.
+}

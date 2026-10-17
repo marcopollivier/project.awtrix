@@ -1,0 +1,22 @@
+meta {
+  name: Estado
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{clock_url}}/api/v1/device
+  body: none
+  auth: basic
+}
+
+auth:basic {
+  username: {{clock_user}}
+  password: {{clock_pass}}
+}
+
+docs {
+  Versão, `uptimeSeconds`, `resetReason` (`software`, `panic`...), memória (`freeHeapBytes`, `minFreeHeapBytes`, `largestFreeBlockBytes`), Wi-Fi, bateria e sensores. O hub usa `uptimeSeconds` para perceber que o relógio reiniciou e reenviar os apps empurrados.
+
+  Se `largestFreeBlockBytes` estiver abaixo de ~20 KB, as conexões HTTPS dos scripts falham: reinicie.
+}

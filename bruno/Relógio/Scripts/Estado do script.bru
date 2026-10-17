@@ -1,0 +1,20 @@
+meta {
+  name: Estado do script
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{clock_url}}/api/v1/apps/{{script}}/data
+  body: none
+  auth: basic
+}
+
+auth:basic {
+  username: {{clock_user}}
+  password: {{clock_pass}}
+}
+
+docs {
+  O `store` do script: o último valor, a variação do dia (`state`) e, nos apps com login, **os tokens** (`tok` no Instagram e no TikTok). Use com `script` = `linkedin`, `github` ou `youtube`, e não compartilhe a resposta dos outros.
+}

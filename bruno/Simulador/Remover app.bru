@@ -1,0 +1,15 @@
+meta {
+  name: Remover app
+  type: http
+  seq: 2
+}
+
+delete {
+  url: {{sim_url}}/api/v1/apps/{{app}}
+  body: none
+  auth: none
+}
+
+docs {
+  Tira o app da rotação. Remover um app que não existe não é erro.
+}

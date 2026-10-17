@@ -1,0 +1,26 @@
+meta {
+  name: Ligar scripts
+  type: http
+  seq: 5
+}
+
+put {
+  url: {{clock_url}}/api/v1/system
+  body: json
+  auth: basic
+}
+
+auth:basic {
+  username: {{clock_user}}
+  password: {{clock_pass}}
+}
+
+body:json {
+  {
+    "scriptingEnabled": true
+  }
+}
+
+docs {
+  Religa os scripts depois do modo de recuperação (os dois botões laterais segurados ao ligar). Reinicie em seguida.
+}

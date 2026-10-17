@@ -1,0 +1,41 @@
+meta {
+  name: Enviar app
+  type: http
+  seq: 2
+}
+
+put {
+  url: {{clock_url}}/api/v1/apps/pushed/{{app}}
+  body: json
+  auth: basic
+}
+
+auth:basic {
+  username: {{clock_user}}
+  password: {{clock_pass}}
+}
+
+body:json {
+  {
+    "text": [
+      {"text": "3125", "color": "#FFFFFF"},
+      {"text": " +7", "color": "#00FF66"}
+    ],
+    "icon": "tiktok",
+    "durationMs": 7000,
+    "lifetimeMs": 3600000,
+    "progress": 25,
+    "progressColor": "#00A2FF",
+    "progressTrackColor": "#202020"
+  }
+}
+
+docs {
+  Cria ou substitui um app na rotação, como o hub faz para cada contador (`scheduler.counter`).
+
+  Campos (`awtrix.App`): `text` (string ou lista de `{text,color}`), `icon`, `textColor` (`"palette"` usa `palette`), `durationMs`, `lifetimeMs` (some sem atualização), `progress` (0–100), `progressColor`, `progressTrackColor`, `palette`, `textBlinkMs`, `iconMode` (`fixed`/`pushOnce`/`push`), `textAlign` (`center`/`start`), `scroll` (`{mode,speed}`), `repeat`.
+
+  Campo desconhecido: 422.
+
+  No relógio, quem mostra os contadores são os scripts. Empurrar um app com o mesmo conteúdo duplica o contador na rotação.
+}

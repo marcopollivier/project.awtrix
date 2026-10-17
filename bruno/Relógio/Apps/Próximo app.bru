@@ -1,0 +1,20 @@
+meta {
+  name: Próximo app
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{clock_url}}/api/v1/apps/next
+  body: none
+  auth: basic
+}
+
+auth:basic {
+  username: {{clock_user}}
+  password: {{clock_pass}}
+}
+
+docs {
+  Pula para o próximo app da rotação.
+}

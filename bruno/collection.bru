@@ -1,0 +1,13 @@
+docs {
+  # project.awtrix
+  
+  Contratos HTTP do projeto:
+  
+  - **Hub**: o endpoint de métricas (`internal/api`) que os scripts do relógio consultam quando `source` é `auto` ou `hub`.
+  - **Simulador**: o subconjunto da API do AWTRIX NG que o simulador (`internal/sim`) imita, com a mesma rigidez: exige `application/json` e recusa campos desconhecidos.
+  - **Relógio**: as rotas do AWTRIX NG que o hub e os scripts usam (`internal/awtrix`, `internal/deploy`), com Basic auth.
+  
+  Ambiente **Local**: `clock_url`, `clock_user` e `clock_pass` são secretos. O Bruno guarda esses valores só na sua máquina, e eles não vão para o git. Preencha com os mesmos `device.url`, `AWTRIX_USER` e `AWTRIX_PASS` do `config.yaml`/`.env`.
+  
+  O NG valida tudo: uma chave desconhecida no JSON responde 422. Os campos válidos estão em `internal/awtrix/types.go`.
+}
