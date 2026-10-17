@@ -410,6 +410,8 @@ func cmdDeploy(ctx context.Context, args []string) error {
 	target := fl.String("target", "", "relógio (padrão: device.url da config)")
 	only := fl.String("only", "", "instala só estes scripts, separados por vírgula (ex.: counter,github)")
 	noIcons := fl.Bool("no-icons", false, "não envia os ícones")
+	force := fl.Bool("force", false, "reinstala os scripts mesmo sem mudança")
+	noReboot := fl.Bool("no-reboot", false, "não reinicia o relógio quando o counter muda")
 	fl.Parse(args)
 	log := newLogger(false)
 	cfg, err := loadConfig(*cfgPath, log)
@@ -442,7 +444,7 @@ func cmdDeploy(ctx context.Context, args []string) error {
 	if *only != "" {
 		names = strings.Split(*only, ",")
 	}
-	if err := deploy.Deploy(ctx, client, *target, scripts, deploy.Settings(cfg, followers), names, log); err != nil {
+	if err := deploy.Deploy(ctx, client, *target, scripts, deploy.Settings(cfg, followers), deploy.Options{Only: names, Force: *force, NoReboot: *noReboot}, log); err != nil {
 		return err
 	}
 	fmt.Println("pronto: o relógio busca os dados sozinho; o hub é opcional")

@@ -26,7 +26,7 @@ make mock                  # fake data for every source, simulator only, throwaw
 make replay                # recorded Vasco match in the simulator
 make hooks                 # enable .githooks/pre-push (gitleaks, Go checks, Berry tests)
 
-./bin/awtrix-hub deploy [--only counter,github] [--no-icons]   # install scripts on the clock
+./bin/awtrix-hub deploy [--only counter,github] [--no-icons] [--force] [--no-reboot]   # install scripts on the clock
 ./bin/awtrix-hub set linkedin 7430                             # manual counter, also PATCHes the clock
 ```
 
@@ -72,7 +72,9 @@ The age is computed hub-side, so clock skew does not matter. The scripts use the
 `internal/deploy`:
 - installs modules first;
 - fills each script's `@config` from config/.env through `deploy.Settings`;
-- reports compile errors from `GET /api/v1/apps`.
+- reports compile errors from `GET /api/v1/apps`;
+- skips scripts whose installed source (`GET /api/v1/apps/script/{name}`) is byte-identical, unless `--force`;
+- reboots the clock (`POST /api/v1/device/reboot`) when a module was installed or configured, unless `--no-reboot`. Every importing script recompiles at once and fragments the heap: 70 KB free but an 11 KB largest block, and the logs say `heap too tight for TLS` for every HTTPS fetch.
 
 Every key in `deploy.Settings` must exist as a `# @config <key>` line in that script, or the clock rejects the PATCH. `TestScriptsMatchSettings` enforces this, so change both sides together.
 

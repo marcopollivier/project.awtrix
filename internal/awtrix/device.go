@@ -110,6 +110,26 @@ func (c *Client) PutScript(ctx context.Context, target, name string, src []byte)
 	return err
 }
 
+// Script returns an installed script's source, byte for byte what PutScript
+// sent; found is false when no script has that name.
+func (c *Client) Script(ctx context.Context, target, name string) (src []byte, found bool, err error) {
+	b, err := c.do(ctx, http.MethodGet, strings.TrimRight(target, "/")+"/api/v1/apps/script/"+url.PathEscape(name), "", nil)
+	if se, ok := errors.AsType[*StatusError](err); ok && se.Status == http.StatusNotFound {
+		return nil, false, nil
+	}
+	if err != nil {
+		return nil, false, err
+	}
+	return b, true, nil
+}
+
+// Reboot restarts the clock, as the web UI's reboot button does (empty JSON
+// POST). The scripts come back with their stored state.
+func (c *Client) Reboot(ctx context.Context, target string) error {
+	_, err := c.do(ctx, http.MethodPost, strings.TrimRight(target, "/")+"/api/v1/device/reboot", "application/json", bytes.NewReader(nil))
+	return err
+}
+
 // PatchAppConfig changes a script's @config settings (the script restarts).
 func (c *Client) PatchAppConfig(ctx context.Context, target, name string, values map[string]any) error {
 	body, err := json.Marshal(values)

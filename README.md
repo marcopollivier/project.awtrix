@@ -274,7 +274,7 @@ tail -f ~/Library/Logs/awtrix-hub.log
 
 | Comando | O que faz |
 |---|---|
-| `./bin/awtrix-hub deploy` | instala ícones, scripts e configurações no relógio (`--only github,youtube` para alguns) |
+| `./bin/awtrix-hub deploy` | instala ícones, scripts e configurações no relógio (`--only github,youtube` para alguns). Só reinstala o script que mudou; se mexer no `counter`, reinicia o relógio no fim (`--no-reboot` evita, `--force` reinstala tudo) |
 | `./bin/awtrix-hub set linkedin 7430` | atualiza o LinkedIn no relógio na hora |
 | `./bin/awtrix-hub tiktok login [--hub]` | autoriza a conta do TikTok no relógio (ou no hub) |
 | `./bin/awtrix-hub icons` | só envia os ícones |
@@ -292,6 +292,7 @@ O estado do hub (variação do dia, metas, último placar) fica em `~/.awtrix-hu
 | Sintoma | O que fazer |
 |---|---|
 | `deploy` diz `linha N: ...` | erro no script: o relógio diz onde. Veja também o *Console* na interface |
+| Todos os apps com rede pararam e o log diz `heap too tight for TLS` | a memória do relógio fragmentou (acontece quando todos os scripts recompilam juntos). Reinicie o relógio; o `deploy` já faz isso sozinho quando mexe no `counter` |
 | Um app não aparece | sem dado ainda: o app pula a vez até a primeira leitura. Confira a chave no `.env` e o *Console* |
 | Número cinza | sem atualizar há mais de 6h: veja o Wi-Fi e o *Console* |
 | `422` ao enviar para o relógio | chave desconhecida no JSON: o AWTRIX NG valida tudo e diz qual campo |
